@@ -11,7 +11,7 @@ static const char* kTokenNames[] = {
   "int",          "return",             "l_brace",
   "r_brace",      "l_square",           "r_square",
   "l_paren",      "r_paren",            "semi",
-  "equal",        "plus",               "comma"
+  "equal",        "plus",       "minus",        "comma"
 };
 
 const char*

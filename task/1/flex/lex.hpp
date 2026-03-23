@@ -26,6 +26,7 @@ enum Id
   SEMI,
   EQUAL,
   PLUS,
+  MINUS,
   COMMA
 };
 

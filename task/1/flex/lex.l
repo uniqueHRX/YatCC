@@ -27,6 +27,7 @@ IS    ((u|U)|(u|U)?(l|L|ll|LL)|(l|L|ll|LL)(u|U))
 "}"         { ADDCOL(); COME(R_BRACE); }
 
 "+"         { ADDCOL(); COME(PLUS); }
+"-"         { ADDCOL(); COME(MINUS); }
 
 ";"         { ADDCOL(); COME(SEMI); }
 ","         { ADDCOL(); COME(COMMA); }
@@ -39,6 +40,7 @@ L?\"(\\.|[^\\"\n])*\" { ADDCOL(); COME(STRING_LITERAL); }
 
 0[0-7]*{IS}?          { ADDCOL(); COME(CONSTANT); }
 [1-9]{D}*{IS}?        { ADDCOL(); COME(CONSTANT); }
+0x[{D}|a-f|A-F]*{IS}* { ADDCOL(); COME(CONSTANT); }
 
 ^#[^\n]*              { return ~YYEOF; } /* 预处理信息处理，可以从预处理信息中获得文件名以及行号 */
 
