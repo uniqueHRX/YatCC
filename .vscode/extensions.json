@@ -8,6 +8,8 @@
     "daohong-emilio.yash",
     "mike-lischke.vscode-antlr4",
     "twxs.cmake",
+    "vivaxy.vscode-conventional-commits",
+    "github.copilot-chat",
     // 对于项目开发人员：
     "ms-python.python",
     "ms-python.flake8",
