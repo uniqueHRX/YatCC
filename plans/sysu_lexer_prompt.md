@@ -267,34 +267,5 @@ L     [a-zA-Z_]
 7. **EOF 处理**：必须输出 `eof ''` 作为最后一个 token
 8. **空白处理**：`space()` 函数需要正确更新 `mStartOfLine` 和 `mLeadingSpace` 标志
 
-## 7. 输出要求
-
-请输出完整的源代码文件内容，每个文件用代码块包裹并标注文件名：
-
-```antlr4
-// SYsULexer.g4
-lexer grammar SYsULexer;
-
-// 规则定义...
-```
-
-```cpp
-// main.cpp
-#include <iostream>
-#include <fstream>
-// 完整实现...
-```
-
-## 8. 测试验证
-
-建议使用以下测试用例验证输出：
-```c
-# 1 "test.sysu.c"
-int main() {
-    return 42;
-}
-```
-
-比较你的输出与 `clang -cc1 -dump-tokens test.sysu.c` 的结果。
 
 ---END PROMPT---

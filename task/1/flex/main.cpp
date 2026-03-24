@@ -56,7 +56,14 @@ print_token()
     outFile << "\t[StartOfLine]";
   if (lex::g.mLeadingSpace)
     outFile << "\t[LeadingSpace]";
-  outFile << "\tLoc=<0:0>\n";
+  // If neither flag present, we still need a tab placeholder
+  if (!lex::g.mStartOfLine && !lex::g.mLeadingSpace)
+    outFile << "\t";
+  // compute start column (1-based)
+  int startCol = lex::g.mColumn - static_cast<int>(lex::g.mText.length());
+  // ensure not less than 1 (should not happen)
+  if (startCol < 1) startCol = 1;
+  outFile << "\tLoc=<" << lex::g.mFile << ":" << lex::g.mLine << ":" << startCol << ">\n";
   outFile << std::flush;
 }
 

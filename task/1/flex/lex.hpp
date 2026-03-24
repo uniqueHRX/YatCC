@@ -13,21 +13,91 @@ enum Id
   YYerror = 256, /* error  */
   YYUNDEF = 257, /* "invalid token"  */
   IDENTIFIER,
-  CONSTANT,
+  NUMERIC_CONSTANT,
   STRING_LITERAL,
+  CHAR_CONSTANT,
+  // Keywords (35)
+  CHAR,
+  SHORT,
   INT,
+  LONG,
+  FLOAT,
+  DOUBLE,
+  VOID,
+  SIGNED,
+  UNSIGNED,
+  STRUCT,
+  UNION,
+  ENUM,
+  TYPEDEF,
+  EXTERN,
+  STATIC,
+  AUTO,
+  REGISTER,
+  CONST,
+  VOLATILE,
+  RESTRICT,
+  INLINE,
+  IF,
+  ELSE,
+  WHILE,
+  DO,
+  FOR,
+  SWITCH,
+  CASE,
+  DEFAULT,
+  BREAK,
+  CONTINUE,
   RETURN,
-  L_BRACE,
-  R_BRACE,
-  L_SQUARE,
-  R_SQUARE,
+  GOTO,
+  SIZEOF,
+  // Punctuators and operators
   L_PAREN,
   R_PAREN,
-  SEMI,
-  EQUAL,
+  L_SQUARE,
+  R_SQUARE,
+  L_BRACE,
+  R_BRACE,
   PLUS,
   MINUS,
-  COMMA
+  STAR,
+  SLASH,
+  PERCENT,
+  AMP,
+  PIPE,
+  CARET,
+  TILDE,
+  EXCLAIM,
+  LESS,
+  GREATER,
+  EQUAL,
+  QUESTION,
+  COLON,
+  SEMI,
+  COMMA,
+  PERIOD,
+  ARROW,
+  PLUSPLUS,
+  MINUSMINUS,
+  LESSLESS,
+  GREATERGREATER,
+  LESSLESSEQUAL,
+  GREATERGREATEREQUAL,
+  AMPAMP,
+  PIPEPIPE,
+  EQUALEQUAL,
+  EXCLAIMEQUAL,
+  LESSEQUAL,
+  GREATEREQUAL,
+  PLUSEQUAL,
+  MINUSEQUAL,
+  STAREQUAL,
+  SLASHEQUAL,
+  PERCENTEQUAL,
+  AMPEQUAL,
+  PIPEEQUAL,
+  CARETEQUAL,
+  ELLIPSIS
 };
 
 const char*
@@ -47,5 +117,11 @@ extern G g;
 
 int
 come(int tokenId, const char* yytext, int yyleng, int yylineno);
+
+void
+space(char c);
+
+void
+extract_preprocessed_info(const char* line);
 
 } // namespace lex
