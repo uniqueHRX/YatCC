@@ -128,7 +128,7 @@ L?'(\\.|[^\\'\n])+'      { ADDCOL(); COME(CHAR_CONSTANT); }
 
 <<EOF>>                  { ADDCOL(); COME(YYEOF); }
 
-.                        { /* unrecognized character, ignore? */ }
+.                        { /* unrecognized character, ignore */ }
 
 %%
 

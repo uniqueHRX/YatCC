@@ -114,7 +114,11 @@ come(int tokenId, const char* yytext, int yyleng, int yylineno)
 {
   g.mId = Id(tokenId);
   g.mText = { yytext, std::size_t(yyleng) };
-  g.mLine = yylineno;
+  // g.mLine = yylineno;
+
+  if (tokenId == Id::YYEOF) {
+    g.mStartOfLine = false;
+  }
 
   print_token();
   g.mStartOfLine = false;
@@ -133,9 +137,7 @@ space(char c)
     g.mLeadingSpace = false;
   } else if (c == ' ' || c == '\t') {
     g.mColumn++;
-    if (!g.mStartOfLine) {
-      g.mLeadingSpace = true;
-    }
+    g.mLeadingSpace = true;
   }
   // other whitespace characters like \v, \f can be handled similarly
 }
