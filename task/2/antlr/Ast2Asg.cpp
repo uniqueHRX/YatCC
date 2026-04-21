@@ -211,13 +211,156 @@ Ast2Asg::operator()(ast::ExpressionContext* ctx)
 Expr*
 Ast2Asg::operator()(ast::AssignmentExpressionContext* ctx)
 {
-  if (auto p = ctx->additiveExpression())
+  if (auto p = ctx->binaryExpression())
     return self(p);
 
   auto ret = make<BinaryExpr>();
   ret->op = ret->kAssign;
   ret->lft = self(ctx->unaryExpression());
   ret->rht = self(ctx->assignmentExpression());
+  return ret;
+}
+
+Expr*
+Ast2Asg::operator()(ast::ParenExpressionContext* ctx)
+{
+  auto ret = make<ParenExpr>();  
+  ret->sub = self(ctx->binaryExpression());
+  return ret;
+}
+
+Expr*
+Ast2Asg::operator()(ast::BinaryExpressionContext* ctx)
+{
+  if (auto p = ctx->logicalOrExpression())
+    return self(p);
+
+  ABORT();
+}
+
+Expr*
+Ast2Asg::operator()(ast::LogicalOrExpressionContext* ctx)
+{
+  auto children = ctx->children;
+  Expr* ret = self(dynamic_cast<ast::LogicalAndExpressionContext*>(children[0]));
+
+  for (unsigned i = 1; i < children.size(); ++i) {
+    auto node = make<BinaryExpr>();
+
+    auto token = dynamic_cast<antlr4::tree::TerminalNode*>(children[i])
+                   ->getSymbol()
+                   ->getType();
+
+    if (token == ast::Or)
+      node->op = node->kOr;
+    else
+      ABORT();
+
+    node->lft = ret;
+    node->rht = self(dynamic_cast<ast::LogicalAndExpressionContext*>(children[++i]));
+    ret = node;
+  }
+
+  return ret;
+}
+
+Expr*
+Ast2Asg::operator()(ast::LogicalAndExpressionContext* ctx)
+{
+  auto children = ctx->children;
+  Expr* ret = self(dynamic_cast<ast::EqualityExpressionContext*>(children[0]));
+
+  for (unsigned i = 1; i < children.size(); ++i) {
+    auto node = make<BinaryExpr>();
+
+    auto token = dynamic_cast<antlr4::tree::TerminalNode*>(children[i])
+                   ->getSymbol()
+                   ->getType();
+
+    if (token == ast::And)
+      node->op = node->kAnd;
+    else
+      ABORT();
+
+    node->lft = ret;
+    node->rht = self(dynamic_cast<ast::EqualityExpressionContext*>(children[++i]));
+    ret = node;
+  }
+
+  return ret;
+}
+
+Expr*
+Ast2Asg::operator()(ast::EqualityExpressionContext* ctx)
+{
+  auto children = ctx->children;
+  Expr* ret = self(dynamic_cast<ast::ComparitiveExpressionContext*>(children[0]));
+
+  for (unsigned i = 1; i < children.size(); ++i) {
+    auto node = make<BinaryExpr>();
+
+    auto token = dynamic_cast<antlr4::tree::TerminalNode*>(children[i])
+                   ->getSymbol()
+                   ->getType();
+    switch (token) {
+      case ast::EQ:
+        node->op = node->kEq;
+        break;
+
+      case ast::NE:
+        node->op = node->kNe;
+        break;
+
+      default:
+        ABORT();
+    }
+
+    node->lft = ret;
+    node->rht = self(dynamic_cast<ast::ComparitiveExpressionContext*>(children[++i]));
+    ret = node;
+  }
+
+  return ret;
+}
+
+Expr*
+Ast2Asg::operator()(ast::ComparitiveExpressionContext* ctx)
+{
+  auto children = ctx->children;
+  Expr* ret = self(dynamic_cast<ast::AdditiveExpressionContext*>(children[0]));
+
+  for (unsigned i = 1; i < children.size(); ++i) {
+    auto node = make<BinaryExpr>();
+
+    auto token = dynamic_cast<antlr4::tree::TerminalNode*>(children[i])
+                   ->getSymbol()
+                   ->getType();
+    switch (token) {
+      case ast::LT:
+        node->op = node->kLt;
+        break;
+
+      case ast::GT:
+        node->op = node->kGt;
+        break;
+
+      case ast::LE:
+        node->op = node->kLe;
+        break;
+
+      case ast::GE:
+        node->op = node->kGe;
+        break;
+
+      default:
+        ABORT();
+    }
+
+    node->lft = ret;
+    node->rht = self(dynamic_cast<ast::AdditiveExpressionContext*>(children[++i]));
+    ret = node;
+  }
+
   return ret;
 }
 
@@ -311,6 +454,10 @@ Ast2Asg::operator()(ast::UnaryExpressionContext* ctx)
       ret->op = ret->kNeg;
       break;
 
+    case ast::Not:
+      ret->op = ret->kNot;
+      break;
+
     default:
       ABORT();
   }
@@ -359,6 +506,9 @@ Ast2Asg::operator()(ast::PrimaryExpressionContext* ctx)
 
     return ret;
   }
+
+  if (auto p = ctx->parenExpression())
+    return self(p);
 
   ABORT();
 }

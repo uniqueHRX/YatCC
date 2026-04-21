@@ -7,6 +7,7 @@ options {
 primaryExpression
     :   Identifier
     |   Constant
+    |   parenExpression
     ;
 
 postfixExpression
@@ -21,7 +22,7 @@ unaryExpression
     ;
 
 unaryOperator
-    :   Plus | Minus
+    :   Plus|Minus|Not
     ;
 
 multiplicativeExpression
@@ -32,9 +33,34 @@ additiveExpression
     :   multiplicativeExpression ((Plus|Minus) multiplicativeExpression)*
     ;
 
+comparitiveExpression
+    :   additiveExpression ((LT|GT|LE|GE) additiveExpression)*
+    ;
+
+equalityExpression
+    :   comparitiveExpression ((EQ|NE) comparitiveExpression)*
+    ;
+
+logicalAndExpression
+    :   equalityExpression (And equalityExpression)*
+    ;
+
+logicalOrExpression
+    :   logicalAndExpression (Or logicalAndExpression)*
+    ;
+
+binaryExpression
+    :   logicalOrExpression
+    ;
+
+
+parenExpression 
+    :   LeftParen binaryExpression RightParen
+    ;
+
 
 assignmentExpression
-    :   additiveExpression
+    :   binaryExpression
     |   unaryExpression Equal assignmentExpression
     ;
 
