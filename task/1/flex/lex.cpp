@@ -114,7 +114,6 @@ come(int tokenId, const char* yytext, int yyleng, int yylineno)
 {
   g.mId = Id(tokenId);
   g.mText = { yytext, std::size_t(yyleng) };
-  // g.mLine = yylineno;
 
   if (tokenId == Id::YYEOF) {
     g.mStartOfLine = false;
@@ -139,7 +138,6 @@ space(char c)
     g.mColumn++;
     g.mLeadingSpace = true;
   }
-  // other whitespace characters like \v, \f can be handled similarly
 }
 
 void
