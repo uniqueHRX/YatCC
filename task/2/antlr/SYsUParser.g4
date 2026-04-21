@@ -78,7 +78,7 @@ declarationSpecifiers
     ;
 
 declarationSpecifier
-    :   typeSpecifier
+    :   typeQualifier? typeSpecifier
     ;
 
 initDeclaratorList
@@ -92,6 +92,10 @@ initDeclarator
 
 typeSpecifier
     :   Int
+    ;
+
+typeQualifier
+    :   Const
     ;
 
 

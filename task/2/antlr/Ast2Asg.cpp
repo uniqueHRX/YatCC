@@ -89,6 +89,15 @@ Ast2Asg::operator()(ast::DeclarationSpecifiersContext* ctx)
 
     else
       ABORT();
+
+    if (auto p = i->typeQualifier()) {
+      if (ret.second == Type::Qual()) {
+        if (p->Const())
+          ret.second.const_ = true;
+        else
+          ABORT();
+      }
+    }
   }
 
   return ret;
