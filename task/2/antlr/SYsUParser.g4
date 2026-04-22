@@ -92,6 +92,7 @@ initDeclarator
 
 typeSpecifier
     :   Int
+    |   Void
     ;
 
 typeQualifier
@@ -176,7 +177,7 @@ externalDeclaration
     ;
 
 functionDefinition
-    : declarationSpecifiers directDeclarator LeftParen parameterList? RightParen compoundStatement
+    : declarationSpecifiers directDeclarator LeftParen parameterList? RightParen (compoundStatement|Semi)
     ;
 
 parameterList

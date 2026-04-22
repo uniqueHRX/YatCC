@@ -79,6 +79,8 @@ Ast2Asg::operator()(ast::DeclarationSpecifiersContext* ctx)
       if (ret.first == Type::Spec::kINVALID) {
         if (p->Int())
           ret.first = Type::Spec::kInt;
+        else if (p->Void())
+          ret.first = Type::Spec::kVoid;
         else
           ABORT(); // 未知的类型说明符
       }
@@ -746,7 +748,10 @@ Ast2Asg::operator()(ast::FunctionDefinitionContext* ctx)
   }
 
   // 然后处理函数体，此时参数已在符号表中
-  ret->body = self(ctx->compoundStatement());
+  if (ctx->compoundStatement())
+    ret->body = self(ctx->compoundStatement());
+  else
+    ret->body = nullptr;
 
   return ret;
 }
