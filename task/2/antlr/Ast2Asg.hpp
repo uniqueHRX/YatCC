@@ -40,9 +40,9 @@ public:
 
   Expr* operator()(ast::ExpressionContext* ctx);
 
-  Expr* operator()(ast::AssignmentExpressionContext* ctx);
-
   Expr* operator()(ast::ParenExpressionContext* ctx);
+  
+  Expr* operator()(ast::AssignmentExpressionContext* ctx);
 
   Expr* operator()(ast::BinaryExpressionContext* ctx);
 

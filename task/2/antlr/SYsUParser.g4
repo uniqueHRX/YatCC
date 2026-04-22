@@ -11,14 +11,13 @@ primaryExpression
     ;
 
 postfixExpression
-    :   primaryExpression  
+    :   primaryExpression
+    |   postfixExpression LeftBracket expression RightBracket
     ;
 
 unaryExpression
-    :
-    (postfixExpression
+    :   postfixExpression
     |   unaryOperator unaryExpression
-    )
     ;
 
 unaryOperator
@@ -54,11 +53,6 @@ binaryExpression
     ;
 
 
-parenExpression 
-    :   LeftParen binaryExpression RightParen
-    ;
-
-
 assignmentExpression
     :   binaryExpression
     |   unaryExpression Equal assignmentExpression
@@ -66,6 +60,11 @@ assignmentExpression
 
 expression
     :   assignmentExpression (Comma assignmentExpression)*
+    ;
+
+
+parenExpression 
+    :   LeftParen expression RightParen
     ;
 
 

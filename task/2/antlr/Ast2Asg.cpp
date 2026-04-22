@@ -218,6 +218,14 @@ Ast2Asg::operator()(ast::ExpressionContext* ctx)
 }
 
 Expr*
+Ast2Asg::operator()(ast::ParenExpressionContext* ctx)
+{
+  auto ret = make<ParenExpr>();  
+  ret->sub = self(ctx->expression());
+  return ret;
+}
+
+Expr*
 Ast2Asg::operator()(ast::AssignmentExpressionContext* ctx)
 {
   if (auto p = ctx->binaryExpression())
@@ -227,14 +235,6 @@ Ast2Asg::operator()(ast::AssignmentExpressionContext* ctx)
   ret->op = ret->kAssign;
   ret->lft = self(ctx->unaryExpression());
   ret->rht = self(ctx->assignmentExpression());
-  return ret;
-}
-
-Expr*
-Ast2Asg::operator()(ast::ParenExpressionContext* ctx)
-{
-  auto ret = make<ParenExpr>();  
-  ret->sub = self(ctx->binaryExpression());
   return ret;
 }
 
@@ -479,9 +479,14 @@ Ast2Asg::operator()(ast::UnaryExpressionContext* ctx)
 Expr*
 Ast2Asg::operator()(ast::PostfixExpressionContext* ctx)
 {
-  auto children = ctx->children;
-  auto sub = self(dynamic_cast<ast::PrimaryExpressionContext*>(children[0]));
-  return sub;
+  if (auto p = ctx->primaryExpression())
+    return self(p);
+
+  auto ret = make<BinaryExpr>();
+  ret->op = ret->kIndex;
+  ret->lft = self(ctx->postfixExpression());
+  ret->rht = self(ctx->expression());
+  return ret;
 }
 
 Expr*
