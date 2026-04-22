@@ -482,11 +482,26 @@ Ast2Asg::operator()(ast::PostfixExpressionContext* ctx)
   if (auto p = ctx->primaryExpression())
     return self(p);
 
-  auto ret = make<BinaryExpr>();
-  ret->op = ret->kIndex;
-  ret->lft = self(ctx->postfixExpression());
-  ret->rht = self(ctx->expression());
-  return ret;
+  else if (ctx->LeftBracket()) {
+    auto ret = make<BinaryExpr>();
+    ret->op = ret->kIndex;
+    ret->lft = self(ctx->postfixExpression());
+    ret->rht = self(ctx->expression());
+    return ret;
+  }
+
+  else if (ctx->LeftParen()) {
+    auto ret = make<CallExpr>();
+    ret->head = self(ctx->postfixExpression());
+    if (auto p = ctx->expression()) {
+      for (auto&& j: p->assignmentExpression())
+        ret->args.push_back(self(j));
+    }
+    return ret;
+  }
+
+  else
+    ABORT();
 }
 
 Expr*
@@ -642,6 +657,33 @@ Ast2Asg::operator()(ast::DeclarationContext* ctx)
   return ret;
 }
 
+Decl*
+Ast2Asg::operator()(ast::ParameterContext* ctx)
+{
+  auto specs = self(ctx->declarationSpecifiers());
+  auto initDecl = ctx->initDeclarator();
+
+  auto [texp, name] = self(initDecl->declarator(), nullptr);
+
+  auto vdecl = make<VarDecl>();
+  auto type = make<Type>();
+  vdecl->type = type;
+
+  type->spec = specs.first;
+  type->qual = specs.second;
+  type->texp = texp;
+  vdecl->name = std::move(name);
+
+  // 参数不应该有初始化器
+  if (initDecl->initializer())
+    ABORT();
+
+  // 添加到符号表，使其在函数体中可见
+  (*mSymtbl)[vdecl->name] = vdecl;
+
+  return vdecl;
+}
+
 FunctionDecl*
 Ast2Asg::operator()(ast::FunctionDefinitionContext* ctx)
 {
@@ -665,6 +707,14 @@ Ast2Asg::operator()(ast::FunctionDefinitionContext* ctx)
   // 函数定义在签名之后就加入符号表，以允许递归调用
   (*mSymtbl)[ret->name] = ret;
 
+  // 先处理参数，使其在函数体中可见
+  if (ctx->parameterList()) {
+    for (auto&& j : ctx->parameterList()->parameter()) {
+      ret->params.push_back(self(j));
+    }
+  }
+
+  // 然后处理函数体，此时参数已在符号表中
   ret->body = self(ctx->compoundStatement());
 
   return ret;

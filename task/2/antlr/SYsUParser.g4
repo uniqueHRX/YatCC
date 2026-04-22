@@ -13,6 +13,7 @@ primaryExpression
 postfixExpression
     :   primaryExpression
     |   postfixExpression LeftBracket expression RightBracket
+    |   postfixExpression LeftParen expression? RightParen
     ;
 
 unaryExpression
@@ -165,6 +166,14 @@ externalDeclaration
     ;
 
 functionDefinition
-    : declarationSpecifiers directDeclarator LeftParen RightParen compoundStatement
+    : declarationSpecifiers directDeclarator LeftParen parameterList? RightParen compoundStatement
     ;
 
+parameterList
+    :   parameter (Comma parameter)*
+    |   Void
+    ;
+
+parameter
+    :   declarationSpecifiers initDeclarator
+    ;

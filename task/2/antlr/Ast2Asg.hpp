@@ -41,7 +41,7 @@ public:
   Expr* operator()(ast::ExpressionContext* ctx);
 
   Expr* operator()(ast::ParenExpressionContext* ctx);
-  
+
   Expr* operator()(ast::AssignmentExpressionContext* ctx);
 
   Expr* operator()(ast::BinaryExpressionContext* ctx);
@@ -83,6 +83,8 @@ public:
   //============================================================================
 
   std::vector<Decl*> operator()(ast::DeclarationContext* ctx);
+
+  Decl* operator()(ast::ParameterContext* ctx);
 
   FunctionDecl* operator()(ast::FunctionDefinitionContext* ctx);
 
