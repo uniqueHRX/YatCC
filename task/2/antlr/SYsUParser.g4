@@ -126,6 +126,8 @@ statement
     :   compoundStatement
     |   expressionStatement
     |   jumpStatement
+    |   ifStatement
+    |   whileStatement
     ;
 
 compoundStatement
@@ -143,6 +145,14 @@ blockItem
 
 expressionStatement
     :   expression? Semi
+    ;
+
+ifStatement
+    :   If LeftParen expression RightParen statement (Else statement)*
+    ;
+
+whileStatement
+    :   While LeftParen expression RightParen statement
     ;
 
 

@@ -582,7 +582,38 @@ Ast2Asg::operator()(ast::StatementContext* ctx)
   if (auto p = ctx->jumpStatement())
     return self(p);
 
+  if (auto p = ctx->ifStatement())
+    return self(p);
+
+  if (auto p = ctx->whileStatement())
+    return self(p);
+
   ABORT();
+}
+
+Stmt*
+Ast2Asg::operator()(ast::IfStatementContext* ctx)
+{
+  auto ret = make<IfStmt>();
+  ret->cond = self(ctx->expression());
+  ret->then = self(ctx->statement(0));
+
+  if (ctx->Else(0)) {
+    // 有 else 分支，获取第二个 statement
+    ret->else_ = self(ctx->statement(1));
+  }
+
+  return ret;
+}
+
+Stmt*
+Ast2Asg::operator()(ast::WhileStatementContext* ctx)
+{
+  auto ret = make<WhileStmt>();
+  ret->cond = self(ctx->expression());
+  ret->body = self(ctx->statement());
+
+  return ret;
 }
 
 CompoundStmt*
@@ -773,3 +804,4 @@ Ast2Asg::operator()(ast::InitDeclaratorContext* ctx, SpecQual sq)
 }
 
 } // namespace asg
+

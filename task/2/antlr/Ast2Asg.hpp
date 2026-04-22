@@ -78,6 +78,10 @@ public:
 
   Stmt* operator()(ast::JumpStatementContext* ctx);
 
+  Stmt* operator()(ast::IfStatementContext* ctx);
+
+  Stmt* operator()(ast::WhileStatementContext* ctx);
+
   //============================================================================
   // 声明
   //============================================================================
