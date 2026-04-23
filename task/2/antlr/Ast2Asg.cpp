@@ -667,6 +667,18 @@ Ast2Asg::operator()(ast::JumpStatementContext* ctx)
     return ret;
   }
 
+  if (ctx->Break()) {
+    auto ret = make<BreakStmt>();
+    ret->loop = mCurrentFunc->body->dcst<WhileStmt>();
+    return ret;
+  }
+
+  if (ctx->Continue()) {
+    auto ret = make<ContinueStmt>();
+    ret->loop = mCurrentFunc->body->dcst<WhileStmt>();
+    return ret;
+  }
+
   ABORT();
 }
 
@@ -747,7 +759,7 @@ Ast2Asg::operator()(ast::FunctionDefinitionContext* ctx)
     }
   }
 
-  // 然后处理函数体，此时参数已在符号表中
+  // 然后处理函数体，此时参数已在符号表中，考虑函数声明的情况
   if (ctx->compoundStatement())
     ret->body = self(ctx->compoundStatement());
   else

@@ -159,8 +159,8 @@ whileStatement
 
 
 jumpStatement
-    :   (Return expression?)
-    Semi
+    :   (Return expression?) Semi
+    |   (Break|Continue) Semi
     ;
 
 compilationUnit
