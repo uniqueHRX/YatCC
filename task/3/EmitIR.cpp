@@ -66,6 +66,16 @@ EmitIR::operator()(Expr* obj)
   // TODO: 在此添加对更多表达式处理的跳转
   if (auto p = obj->dcst<IntegerLiteral>())
     return self(p);
+
+  if (auto p = obj->dcst<DeclRefExpr>())
+    return self(p);
+
+  if (auto p = obj->dcst<ImplicitCastExpr>())
+    return self(p);
+
+  if (auto p = obj->dcst<BinaryExpr>())
+    return self(p);
+
   ABORT();
 }
 
@@ -76,6 +86,59 @@ EmitIR::operator()(IntegerLiteral* obj)
 }
 
 // TODO: 在此添加对更多表达式类型的处理
+llvm::Value*
+EmitIR::operator()(asg::BinaryExpr* obj)
+{
+  llvm::Value *lftVal = self(obj->lft);
+  llvm::Value *rhtVal = self(obj->rht);
+
+  auto& irb = *mCurIrb;
+
+  switch (obj->op) {
+    case BinaryExpr::Op::kAdd:
+      return irb.CreateAdd(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kSub:
+      return irb.CreateSub(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kMul:
+      return irb.CreateMul(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kDiv:
+      return irb.CreateSDiv(lftVal, rhtVal);
+
+    default:
+      ABORT();
+  }
+}
+
+llvm::Value*
+EmitIR::operator()(asg::ImplicitCastExpr* obj)
+{
+  auto sub = self(obj->sub);
+
+  auto& irb = *mCurIrb;
+
+  switch (obj->kind) {
+    // LtoR 值转换
+    case ImplicitCastExpr::kLValueToRValue: {
+      auto ty = self(obj->sub->type);
+      auto loadVal = irb.CreateLoad(ty, sub);
+      return loadVal;
+    }
+
+    default:
+      ABORT();
+  }
+}
+
+llvm::Value*
+EmitIR::operator()(asg::DeclRefExpr* obj)
+{
+  // 在LLVM IR层面，左值体现为返回指向值的指针
+  // 在ImplicitCastExpr::kLValueToRValue中发射load指令从而变成右值
+  return reinterpret_cast<llvm::Value*>(obj->decl->any);
+}
 
 //==============================================================================
 // 语句
@@ -130,6 +193,8 @@ void
 EmitIR::operator()(Decl* obj)
 {
   // TODO: 添加变量声明处理的跳转
+  if (auto p = obj->dcst<VarDecl>())
+    return self(p);
 
   if (auto p = obj->dcst<FunctionDecl>())
     return self(p);
@@ -138,6 +203,48 @@ EmitIR::operator()(Decl* obj)
 }
 
 // TODO: 添加变量声明的处理
+void
+EmitIR::trans_init(llvm::Value* val, Expr* obj)
+{
+  auto& irb = *mCurIrb;
+
+  // 仅处理整数字面量的初始化
+  if (auto p = obj->dcst<IntegerLiteral>()) {
+    auto initVal = llvm::ConstantInt::get(self(p->type), p->val);
+    irb.CreateStore(initVal, val);
+    return;
+  }
+
+  // 如果表达式不是整数字面量，则中断编译
+  ABORT();
+}
+
+void
+EmitIR::operator()(VarDecl* obj)
+{
+  auto ty = llvm::Type::getInt32Ty(mCtx);
+  auto gvar = new llvm::GlobalVariable(
+    mMod, ty, false, llvm::GlobalVariable::ExternalLinkage, nullptr, obj->name
+  );
+
+  obj->any = gvar;
+
+  // 默认初始化为 0
+  gvar->setInitializer(llvm::ConstantInt::get(ty, 0));
+
+  if (obj->init == nullptr)
+    return;
+
+  // 创建构造函数用于初始化
+  mCurFunc = llvm::Function::Create(
+    mCtorTy, llvm::GlobalVariable::PrivateLinkage, "ctor_" + obj->name, mMod);
+  llvm::appendToGlobalCtors(mMod, mCurFunc, 65535);
+
+  auto entryBb = llvm::BasicBlock::Create(mCtx, "entry", mCurFunc);
+  mCurIrb->SetInsertPoint(entryBb);
+  trans_init(gvar, obj->init);
+  mCurIrb->CreateRet(nullptr);
+}
 
 void
 EmitIR::operator()(FunctionDecl* obj)
