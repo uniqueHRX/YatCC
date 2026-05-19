@@ -107,6 +107,36 @@ EmitIR::operator()(asg::BinaryExpr* obj)
     case BinaryExpr::Op::kDiv:
       return irb.CreateSDiv(lftVal, rhtVal);
 
+    case BinaryExpr::Op::kMod:
+      return irb.CreateSRem(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kGt:
+      return irb.CreateICmpSGT(lftVal, rhtVal);
+    
+    case BinaryExpr::Op::kLt:
+      return irb.CreateICmpSLT(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kGe:
+      return irb.CreateICmpSGE(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kLe:
+      return irb.CreateICmpSLE(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kEq:
+      return irb.CreateICmpEQ(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kNe:
+      return irb.CreateICmpNE(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kAnd:
+      return irb.CreateAnd(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kOr:
+      return irb.CreateOr(lftVal, rhtVal);
+
+    case BinaryExpr::Op::kAssign:
+      return irb.CreateStore(rhtVal, lftVal);
+
     default:
       ABORT();
   }
@@ -155,10 +185,14 @@ EmitIR::operator()(Stmt* obj)
   if (auto p = obj->dcst<ReturnStmt>())
     return self(p);
 
+  if (auto p = obj->dcst<DeclStmt>())
+    return self(p);
+
+  if (auto p = obj->dcst<ExprStmt>())
+    return self(p);
+
   ABORT();
 }
-
-// TODO: 在此添加对更多Stmt类型的处理
 
 void
 EmitIR::operator()(CompoundStmt* obj)
@@ -185,6 +219,20 @@ EmitIR::operator()(ReturnStmt* obj)
   mCurIrb->SetInsertPoint(exitBb);
 }
 
+// TODO: 在此添加对更多Stmt类型的处理
+void
+EmitIR::operator()(DeclStmt* obj)
+{
+  for (auto&& decl : obj->decls)
+    self(decl);
+}
+
+void
+EmitIR::operator()(ExprStmt* obj)
+{
+  self(obj->expr);
+}
+
 //==============================================================================
 // 声明
 //==============================================================================
@@ -203,6 +251,8 @@ EmitIR::operator()(Decl* obj)
 }
 
 // TODO: 添加变量声明的处理
+
+// 变量初始化方法
 void
 EmitIR::trans_init(llvm::Value* val, Expr* obj)
 {
@@ -222,28 +272,53 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj)
 void
 EmitIR::operator()(VarDecl* obj)
 {
-  auto ty = llvm::Type::getInt32Ty(mCtx);
-  auto gvar = new llvm::GlobalVariable(
-    mMod, ty, false, llvm::GlobalVariable::ExternalLinkage, nullptr, obj->name
-  );
+  // 处理全局变量
+  if (mCurIrb->GetInsertBlock() == nullptr) {
+    auto ty = llvm::Type::getInt32Ty(mCtx);
+    auto gvar = new llvm::GlobalVariable(
+      mMod, ty, false, llvm::GlobalVariable::ExternalLinkage, nullptr, obj->name
+    );
+    obj->any = gvar;
 
-  obj->any = gvar;
+    // 默认初始化为 0
+    gvar->setInitializer(llvm::ConstantInt::get(ty, 0));
 
-  // 默认初始化为 0
-  gvar->setInitializer(llvm::ConstantInt::get(ty, 0));
+    if (obj->init == nullptr)
+      return;
 
-  if (obj->init == nullptr)
-    return;
+    // 保存当前函数和基本块
+    auto savedFunc = mCurFunc;
+    auto savedBb = mCurIrb->GetInsertBlock();
 
-  // 创建构造函数用于初始化
-  mCurFunc = llvm::Function::Create(
-    mCtorTy, llvm::GlobalVariable::PrivateLinkage, "ctor_" + obj->name, mMod);
-  llvm::appendToGlobalCtors(mMod, mCurFunc, 65535);
+    // 创建构造函数用于初始化
+    mCurFunc = llvm::Function::Create(
+      mCtorTy, llvm::GlobalVariable::PrivateLinkage, "ctor_" + obj->name, mMod);
+    llvm::appendToGlobalCtors(mMod, mCurFunc, 65535);
+    
+    auto entryBb = llvm::BasicBlock::Create(mCtx, "entry", mCurFunc);
+    mCurIrb->SetInsertPoint(entryBb);
+    trans_init(gvar, obj->init);
+    mCurIrb->CreateRet(nullptr);
 
-  auto entryBb = llvm::BasicBlock::Create(mCtx, "entry", mCurFunc);
-  mCurIrb->SetInsertPoint(entryBb);
-  trans_init(gvar, obj->init);
-  mCurIrb->CreateRet(nullptr);
+    // 恢复当前函数和基本块
+    mCurFunc = savedFunc;
+    mCurIrb->SetInsertPoint(savedBb);
+  }
+
+  // 处理局部变量
+  else {
+    auto& irb = *mCurIrb;
+    auto ty = self(obj->type);
+    auto alloca = irb.CreateAlloca(ty, nullptr, obj->name);
+    obj->any = alloca;
+
+    if (obj->init == nullptr)
+      return;
+
+    trans_init(alloca, obj->init);
+  }
+
+  return;
 }
 
 void

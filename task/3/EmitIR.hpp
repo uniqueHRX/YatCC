@@ -54,6 +54,9 @@ private:
   void operator()(asg::ReturnStmt* obj);
 
   // TODO: 添加语句处理相关声明
+  void operator()(asg::DeclStmt* obj);
+
+  void operator()(asg::ExprStmt* obj);
 
   //============================================================================
   // 声明
