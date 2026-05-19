@@ -37,6 +37,10 @@ private:
   llvm::Constant* operator()(asg::IntegerLiteral* obj);
 
   // TODO: 添加表达式处理相关声明
+  llvm::Value* operator()(asg::ParenExpr* obj);
+
+  llvm::Value* operator()(asg::UnaryExpr* obj);
+
   llvm::Value* operator()(asg::BinaryExpr* obj);
 
   llvm::Value* operator()(asg::ImplicitCastExpr* obj);

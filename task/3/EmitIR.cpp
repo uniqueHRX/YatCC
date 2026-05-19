@@ -67,13 +67,19 @@ EmitIR::operator()(Expr* obj)
   if (auto p = obj->dcst<IntegerLiteral>())
     return self(p);
 
-  if (auto p = obj->dcst<DeclRefExpr>())
+  if (auto p = obj->dcst<ParenExpr>())
+    return self(p);
+
+  if (auto p = obj->dcst<UnaryExpr>())
+    return self(p);
+
+  if (auto p = obj->dcst<BinaryExpr>())
     return self(p);
 
   if (auto p = obj->dcst<ImplicitCastExpr>())
     return self(p);
 
-  if (auto p = obj->dcst<BinaryExpr>())
+  if (auto p = obj->dcst<DeclRefExpr>())
     return self(p);
 
   ABORT();
@@ -86,6 +92,35 @@ EmitIR::operator()(IntegerLiteral* obj)
 }
 
 // TODO: 在此添加对更多表达式类型的处理
+
+// 括号表达式
+llvm::Value*
+EmitIR::operator()(ParenExpr* obj)
+{
+  return self(obj->sub);
+}
+
+// 一元表达式
+llvm::Value*
+EmitIR::operator()(UnaryExpr* obj)
+{
+  llvm::Value* sub = self(obj->sub);
+
+  auto& irb = *mCurIrb;
+
+  switch (obj->op) {
+    case UnaryExpr::Op::kNeg:
+      return irb.CreateNeg(sub);
+
+    case UnaryExpr::Op::kNot:
+      return irb.CreateICmpEQ(sub, irb.getInt32(0));
+
+    default:
+      ABORT();
+  }
+}
+
+// 二元表达式
 llvm::Value*
 EmitIR::operator()(asg::BinaryExpr* obj)
 {
@@ -309,13 +344,13 @@ EmitIR::operator()(VarDecl* obj)
   else {
     auto& irb = *mCurIrb;
     auto ty = self(obj->type);
-    auto alloca = irb.CreateAlloca(ty, nullptr, obj->name);
-    obj->any = alloca;
+    auto lvar = irb.CreateAlloca(ty, nullptr, obj->name);
+    obj->any = lvar;
 
     if (obj->init == nullptr)
       return;
 
-    trans_init(alloca, obj->init);
+    trans_init(lvar, obj->init);
   }
 
   return;
