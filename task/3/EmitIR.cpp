@@ -46,6 +46,14 @@ EmitIR::operator()(const Type* type)
   subt.texp = type->texp->sub;
 
   // TODO: 在此添加对指针类型、数组类型和函数类型的处理
+  if (auto p = type->texp->dcst<PointerType>()) {
+    return llvm::PointerType::get(self(&subt), 0);
+  }
+
+  if (auto p = type->texp->dcst<ArrayType>()) {
+    auto len = p->len;
+    return llvm::ArrayType::get(self(&subt), len);
+  }
 
   if (auto p = type->texp->dcst<FunctionType>()) {
     std::vector<llvm::Type*> pty;
@@ -172,6 +180,13 @@ EmitIR::operator()(asg::BinaryExpr* obj)
     case BinaryExpr::Op::kAssign:
       return irb.CreateStore(rhtVal, lftVal);
 
+    case BinaryExpr::Op::kIndex: {
+      auto p = obj->lft->dcst<ImplicitCastExpr>()->sub;
+      auto ty = self(p->type);
+      auto gep = irb.CreateInBoundsGEP(ty, lftVal, {rhtVal});
+      return gep;
+    }
+
     default:
       ABORT();
   }
@@ -190,6 +205,13 @@ EmitIR::operator()(asg::ImplicitCastExpr* obj)
       auto ty = self(obj->sub->type);
       auto loadVal = irb.CreateLoad(ty, sub);
       return loadVal;
+    }
+
+    case ImplicitCastExpr::kArrayToPointerDecay: {
+      auto p = obj->sub->dcst<ImplicitCastExpr>()->sub;
+      auto ty = self(p->type);
+      auto gep = irb.CreateInBoundsGEP(ty, sub, {irb.getInt32(0)});
+      return gep;
     }
 
     default:
@@ -293,14 +315,37 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj)
 {
   auto& irb = *mCurIrb;
 
-  // 仅处理整数字面量的初始化
+  // 处理整数字面量的初始化
   if (auto p = obj->dcst<IntegerLiteral>()) {
     auto initVal = llvm::ConstantInt::get(self(p->type), p->val);
     irb.CreateStore(initVal, val);
     return;
   }
 
-  // 如果表达式不是整数字面量，则中断编译
+  // 处理变量引用的初始化
+  if (auto p = obj->dcst<DeclRefExpr>()) {
+    auto initVal = irb.CreateLoad(self(p->decl->type), reinterpret_cast<llvm::Value*>(p->decl->any));
+    irb.CreateStore(initVal, val);
+    return;
+  }
+
+  // 处理零初始化
+  if (auto p = obj->dcst<ImplicitInitExpr>()) {
+    return;
+  }
+
+  // 处理初始化列表的初始化
+  if (auto p = obj->dcst<InitListExpr>()) {
+    for (std::size_t i = 0; i < p->list.size(); ++i) {
+      auto ty = self(p->list[i]->type);
+      auto gep = irb.CreateInBoundsGEP(ty, val, {irb.getInt32(0), irb.getInt32(i)});
+
+      trans_init(gep, p->list[i]);
+    }
+    return;
+  }
+
+  // 如果表达式不是上述类型，则抛出异常
   ABORT();
 }
 
@@ -309,7 +354,7 @@ EmitIR::operator()(VarDecl* obj)
 {
   // 处理全局变量
   if (mCurIrb->GetInsertBlock() == nullptr) {
-    auto ty = llvm::Type::getInt32Ty(mCtx);
+    auto ty = self(obj->type);
     auto gvar = new llvm::GlobalVariable(
       mMod, ty, false, llvm::GlobalVariable::ExternalLinkage, nullptr, obj->name
     );
