@@ -78,6 +78,9 @@ EmitIR::operator()(Expr* obj)
   // TODO: 在此添加对更多表达式处理的跳转
   if (auto p = obj->dcst<IntegerLiteral>())
     return self(p);
+  
+  if (auto p = obj->dcst<DeclRefExpr>())
+    return self(p);
 
   if (auto p = obj->dcst<ParenExpr>())
     return self(p);
@@ -95,9 +98,6 @@ EmitIR::operator()(Expr* obj)
     return self(p);
 
   if (auto p = obj->dcst<ImplicitCastExpr>())
-    return self(p);
-
-  if (auto p = obj->dcst<DeclRefExpr>())
     return self(p);
 
   ABORT();
@@ -226,17 +226,17 @@ EmitIR::operator()(CallExpr* obj)
   return irb.CreateCall(func, args);
 }
 
-// // 隐式空初始化表达式
-// llvm::Value*
-// EmitIR::operator()(asg::ImplicitInitExpr* obj)
-// {
-//   auto ty = self(obj->type);
+// 隐式空初始化表达式
+llvm::Value*
+EmitIR::operator()(asg::ImplicitInitExpr* obj)
+{
+  auto ty = self(obj->type);
 
-//   if (ty->isAggregateType())
-//     return llvm::Constant::getNullValue(ty);
+  if (ty->isAggregateType())
+    return llvm::Constant::getNullValue(ty);
 
-//   return llvm::ConstantInt::get(ty, 0);
-// }
+  return llvm::ConstantInt::get(ty, 0);
+}
 
 // 隐式类型转换表达式
 llvm::Value*
@@ -371,44 +371,7 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj, llvm::Type* initTy)
 {
   auto& irb = *mCurIrb;
 
-  // 处理整数字面量的初始化
-  if (auto p = obj->dcst<IntegerLiteral>()) {
-    auto initVal = llvm::ConstantInt::get(self(p->type), p->val);
-    irb.CreateStore(initVal, val);
-    return;
-  }
-
-  // 处理变量引用的初始化
-  if (auto p = obj->dcst<DeclRefExpr>()) {
-    auto initVal = irb.CreateLoad(self(p->decl->type), reinterpret_cast<llvm::Value*>(p->decl->any));
-    irb.CreateStore(initVal, val);
-    return;
-  }
-
-  // 处理函数调用的初始化
-  if (auto p = obj->dcst<CallExpr>()) {
-    auto initVal = self(p);
-    irb.CreateStore(initVal, val);
-    return;
-  }
-
-  // 处理隐式零初始化
-  if (auto p = obj->dcst<ImplicitInitExpr>()) {
-    if (initTy->isAggregateType()) {
-      auto zero = llvm::Constant::getNullValue(initTy);
-      irb.CreateStore(zero, val);
-    }
-    return;
-  }
-
-  // 处理隐式类型转换的初始化
-  if (auto p = obj->dcst<ImplicitCastExpr>()) {
-    auto initVal = self(p);
-    irb.CreateStore(initVal, val);
-    return;
-  }
-
-  // 处理初始化列表的初始化
+  // 处理列表初始化
   if (auto p = obj->dcst<InitListExpr>()) {
     if (!initTy->isArrayTy())
       ABORT();
@@ -425,9 +388,13 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj, llvm::Type* initTy)
     }
     return;
   }
-
-  // 如果表达式不是上述类型，则抛出异常
-  ABORT();
+  
+  // 处理单值初始化
+  else {
+    auto initVal = self(obj);
+    irb.CreateStore(initVal, val);
+    return;
+  }
 }
 
 void
