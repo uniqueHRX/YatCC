@@ -43,7 +43,9 @@ private:
 
   llvm::Value* operator()(asg::BinaryExpr* obj);
 
-  llvm::Value* operator()(asg::ImplicitInitExpr* obj);
+  llvm::Value* operator()(asg::CallExpr* obj);
+
+  // llvm::Value* operator()(asg::ImplicitInitExpr* obj);
 
   llvm::Value* operator()(asg::ImplicitCastExpr* obj);
   

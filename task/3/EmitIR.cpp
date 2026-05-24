@@ -58,6 +58,10 @@ EmitIR::operator()(const Type* type)
   if (auto p = type->texp->dcst<FunctionType>()) {
     std::vector<llvm::Type*> pty;
     // TODO: 在此添加对函数参数类型的处理
+    if (!p->params.empty())
+       for (auto&& param : p->params)
+         pty.push_back(self(param));
+
     return llvm::FunctionType::get(self(&subt), std::move(pty), false);
   }
 
@@ -82,6 +86,9 @@ EmitIR::operator()(Expr* obj)
     return self(p);
 
   if (auto p = obj->dcst<BinaryExpr>())
+    return self(p);
+
+  if (auto p = obj->dcst<CallExpr>())
     return self(p);
 
   if (auto p = obj->dcst<ImplicitInitExpr>())
@@ -202,17 +209,34 @@ EmitIR::operator()(asg::BinaryExpr* obj)
   }
 }
 
-// 隐式空初始化表达式
+// 函数调用表达式
 llvm::Value*
-EmitIR::operator()(asg::ImplicitInitExpr* obj)
+EmitIR::operator()(CallExpr* obj)
 {
-  auto ty = self(obj->type);
+  auto& irb = *mCurIrb;
 
-  if (ty->isAggregateType())
-    return llvm::Constant::getNullValue(ty);
+  // 直接通过dyn_cast拿到被调用函数的llvm::Function对象
+  auto func = llvm::dyn_cast<llvm::Function>(self(obj->head));
 
-  return llvm::ConstantInt::get(ty, 0);
+  // 处理函数参数
+  std::vector<llvm::Value*> args;
+  for (auto&& arg : obj->args)
+    args.push_back(self(arg));
+
+  return irb.CreateCall(func, args);
 }
+
+// // 隐式空初始化表达式
+// llvm::Value*
+// EmitIR::operator()(asg::ImplicitInitExpr* obj)
+// {
+//   auto ty = self(obj->type);
+
+//   if (ty->isAggregateType())
+//     return llvm::Constant::getNullValue(ty);
+
+//   return llvm::ConstantInt::get(ty, 0);
+// }
 
 // 隐式类型转换表达式
 llvm::Value*
@@ -361,6 +385,13 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj, llvm::Type* initTy)
     return;
   }
 
+  // 处理函数调用的初始化
+  if (auto p = obj->dcst<CallExpr>()) {
+    auto initVal = self(p);
+    irb.CreateStore(initVal, val);
+    return;
+  }
+
   // 处理隐式零初始化
   if (auto p = obj->dcst<ImplicitInitExpr>()) {
     if (initTy->isAggregateType()) {
@@ -471,6 +502,14 @@ EmitIR::operator()(FunctionDecl* obj)
   auto& entryIrb = *mCurIrb;
 
   // TODO: 添加对函数参数的处理
+  for (std::size_t i = 0; i < fty->getNumParams(); ++i) {
+    auto param = obj->params[i];
+    auto arg = func->getArg(i);
+    arg->setName(param->name);
+    auto alloca = entryIrb.CreateAlloca(arg->getType(), nullptr, param->name);
+    entryIrb.CreateStore(arg, alloca);
+    param->any = alloca;
+  }
 
   // 翻译函数体
   mCurFunc = func;
