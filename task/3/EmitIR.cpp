@@ -313,6 +313,9 @@ EmitIR::operator()(Stmt* obj)
   if (auto p = obj->dcst<IfStmt>())
     return self(p);
 
+  if (auto p = obj->dcst<WhileStmt>())
+    return self(p);
+
   ABORT();
 }
 
@@ -389,6 +392,37 @@ EmitIR::operator()(IfStmt* obj)
     if (!irb.GetInsertBlock()->getTerminator())
       irb.CreateBr(mergeBb);
   }
+
+  // 调整插入点到mergeBb，方便后续的代码生成
+  mCurIrb->SetInsertPoint(mergeBb);
+}
+
+void
+EmitIR::operator()(WhileStmt* obj)
+{
+  auto& irb = *mCurIrb;
+
+  // 创建基本块
+  auto condBb = llvm::BasicBlock::Create(mCtx, "while.cond", mCurFunc);
+  auto bodyBb = llvm::BasicBlock::Create(mCtx, "while.body", mCurFunc);
+  auto mergeBb = llvm::BasicBlock::Create(mCtx, "while.end", mCurFunc);
+
+  // 跳转到条件判断基本块
+  irb.CreateBr(condBb);
+
+  // 处理条件判断基本块
+  irb.SetInsertPoint(condBb);
+  auto condVal = self(obj->cond);
+  if (condVal->getType()->isIntegerTy(32))
+    condVal = irb.CreateICmpNE(condVal, irb.getInt32(0));
+  irb.CreateCondBr(condVal, bodyBb, mergeBb);
+
+  // 处理循环体基本块
+  irb.SetInsertPoint(bodyBb);
+  self(obj->body);
+  // 如果循环体没有以跳转语句结束，则添加跳转回condBb的指令
+  if (!irb.GetInsertBlock()->getTerminator())
+    irb.CreateBr(condBb);
 
   // 调整插入点到mergeBb，方便后续的代码生成
   mCurIrb->SetInsertPoint(mergeBb);
