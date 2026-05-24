@@ -84,6 +84,9 @@ EmitIR::operator()(Expr* obj)
   if (auto p = obj->dcst<BinaryExpr>())
     return self(p);
 
+  if (auto p = obj->dcst<ImplicitInitExpr>())
+    return self(p);
+
   if (auto p = obj->dcst<ImplicitCastExpr>())
     return self(p);
 
@@ -117,6 +120,9 @@ EmitIR::operator()(UnaryExpr* obj)
   auto& irb = *mCurIrb;
 
   switch (obj->op) {
+    case UnaryExpr::Op::kPos:
+      return sub;
+
     case UnaryExpr::Op::kNeg:
       return irb.CreateNeg(sub);
 
@@ -178,12 +184,16 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       return irb.CreateOr(lftVal, rhtVal);
 
     case BinaryExpr::Op::kAssign:
-      return irb.CreateStore(rhtVal, lftVal);
+      irb.CreateStore(rhtVal, lftVal);
+      return rhtVal;
+
+    case BinaryExpr::Op::kComma:
+      return rhtVal;
 
     case BinaryExpr::Op::kIndex: {
       auto p = obj->lft->dcst<ImplicitCastExpr>()->sub;
       auto ty = self(p->type);
-      auto gep = irb.CreateInBoundsGEP(ty, lftVal, {rhtVal});
+      auto gep = irb.CreateInBoundsGEP(ty, lftVal, {irb.getInt64(0), rhtVal});
       return gep;
     }
 
@@ -192,6 +202,19 @@ EmitIR::operator()(asg::BinaryExpr* obj)
   }
 }
 
+// 隐式空初始化表达式
+llvm::Value*
+EmitIR::operator()(asg::ImplicitInitExpr* obj)
+{
+  auto ty = self(obj->type);
+
+  if (ty->isAggregateType())
+    return llvm::Constant::getNullValue(ty);
+
+  return llvm::ConstantInt::get(ty, 0);
+}
+
+// 隐式类型转换表达式
 llvm::Value*
 EmitIR::operator()(asg::ImplicitCastExpr* obj)
 {
@@ -203,16 +226,25 @@ EmitIR::operator()(asg::ImplicitCastExpr* obj)
     // LtoR 值转换
     case ImplicitCastExpr::kLValueToRValue: {
       auto ty = self(obj->sub->type);
-      auto loadVal = irb.CreateLoad(ty, sub);
-      return loadVal;
+      return irb.CreateLoad(ty, sub);
     }
 
+    // 数组到指针转换
     case ImplicitCastExpr::kArrayToPointerDecay: {
-      auto p = obj->sub->dcst<ImplicitCastExpr>()->sub;
-      auto ty = self(p->type);
-      auto gep = irb.CreateInBoundsGEP(ty, sub, {irb.getInt32(0)});
-      return gep;
+      // sub 是被 decay 的数组地址（DeclRefExpr → ImplicitCastExpr 链底）
+      // 直接穿透到最内层非 cast 节点拿类型
+      auto inner = obj->sub;
+      while (auto cast = inner->dcst<ImplicitCastExpr>())
+        inner = cast->sub;
+      auto ty = self(inner->type);
+      return irb.CreateInBoundsGEP(ty, sub, {irb.getInt64(0), irb.getInt64(0)});
     }
+
+    case ImplicitCastExpr::kFunctionToPointerDecay:
+      return sub;
+
+    case ImplicitCastExpr::kNoOp:
+      return sub;
 
     default:
       ABORT();
@@ -311,7 +343,7 @@ EmitIR::operator()(Decl* obj)
 
 // 变量初始化方法
 void
-EmitIR::trans_init(llvm::Value* val, Expr* obj)
+EmitIR::trans_init(llvm::Value* val, Expr* obj, llvm::Type* initTy)
 {
   auto& irb = *mCurIrb;
 
@@ -329,18 +361,36 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj)
     return;
   }
 
-  // 处理零初始化
+  // 处理隐式零初始化
   if (auto p = obj->dcst<ImplicitInitExpr>()) {
+    if (initTy->isAggregateType()) {
+      auto zero = llvm::Constant::getNullValue(initTy);
+      irb.CreateStore(zero, val);
+    }
+    return;
+  }
+
+  // 处理隐式类型转换的初始化
+  if (auto p = obj->dcst<ImplicitCastExpr>()) {
+    auto initVal = self(p);
+    irb.CreateStore(initVal, val);
     return;
   }
 
   // 处理初始化列表的初始化
   if (auto p = obj->dcst<InitListExpr>()) {
-    for (std::size_t i = 0; i < p->list.size(); ++i) {
-      auto ty = self(p->list[i]->type);
-      auto gep = irb.CreateInBoundsGEP(ty, val, {irb.getInt32(0), irb.getInt32(i)});
+    if (!initTy->isArrayTy())
+      ABORT();
 
-      trans_init(gep, p->list[i]);
+    auto elemTy = initTy->getArrayElementType();
+
+    for (std::size_t i = 0; i < initTy->getArrayNumElements(); ++i) {
+      auto gep = irb.CreateInBoundsGEP(initTy, val, {irb.getInt64(0), irb.getInt64(i)});
+      // 有值则初始化，没有值则默认初始化为 0
+      if (i < p->list.size())
+        trans_init(gep, p->list[i], elemTy);
+      else
+        irb.CreateStore(llvm::Constant::getNullValue(elemTy), gep);
     }
     return;
   }
@@ -361,7 +411,10 @@ EmitIR::operator()(VarDecl* obj)
     obj->any = gvar;
 
     // 默认初始化为 0
-    gvar->setInitializer(llvm::ConstantInt::get(ty, 0));
+    if (ty->isAggregateType())
+      gvar->setInitializer(llvm::Constant::getNullValue(ty));
+    else
+      gvar->setInitializer(llvm::ConstantInt::get(ty, 0));
 
     if (obj->init == nullptr)
       return;
@@ -377,7 +430,7 @@ EmitIR::operator()(VarDecl* obj)
     
     auto entryBb = llvm::BasicBlock::Create(mCtx, "entry", mCurFunc);
     mCurIrb->SetInsertPoint(entryBb);
-    trans_init(gvar, obj->init);
+    trans_init(gvar, obj->init, ty);
     mCurIrb->CreateRet(nullptr);
 
     // 恢复当前函数和基本块
@@ -395,7 +448,7 @@ EmitIR::operator()(VarDecl* obj)
     if (obj->init == nullptr)
       return;
 
-    trans_init(lvar, obj->init);
+    trans_init(lvar, obj->init, ty);
   }
 
   return;

@@ -43,6 +43,8 @@ private:
 
   llvm::Value* operator()(asg::BinaryExpr* obj);
 
+  llvm::Value* operator()(asg::ImplicitInitExpr* obj);
+
   llvm::Value* operator()(asg::ImplicitCastExpr* obj);
   
   llvm::Value* operator()(asg::DeclRefExpr* obj);
@@ -68,7 +70,7 @@ private:
 
   void operator()(asg::Decl* obj);
 
-  void trans_init(llvm::Value* val, asg::Expr* obj);
+  void trans_init(llvm::Value* val, asg::Expr* obj, llvm::Type* initTy);
 
   void operator()(asg::VarDecl* obj);
 
