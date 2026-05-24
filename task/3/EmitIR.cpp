@@ -316,6 +316,12 @@ EmitIR::operator()(Stmt* obj)
   if (auto p = obj->dcst<WhileStmt>())
     return self(p);
 
+  if (auto p = obj->dcst<BreakStmt>())
+    return self(p);
+
+  if (auto p = obj->dcst<ContinueStmt>())
+    return self(p);
+
   ABORT();
 }
 
@@ -419,6 +425,8 @@ EmitIR::operator()(WhileStmt* obj)
 
   // 处理循环体基本块
   irb.SetInsertPoint(bodyBb);
+  mExitBb = mergeBb;
+  mContinueBb = condBb;
   self(obj->body);
   // 如果循环体没有以跳转语句结束，则添加跳转回condBb的指令
   if (!irb.GetInsertBlock()->getTerminator())
@@ -426,6 +434,20 @@ EmitIR::operator()(WhileStmt* obj)
 
   // 调整插入点到mergeBb，方便后续的代码生成
   mCurIrb->SetInsertPoint(mergeBb);
+}
+
+void
+EmitIR::operator()(BreakStmt* obj)
+{
+  auto& irb = *mCurIrb;
+  irb.CreateBr(mExitBb);
+}
+
+void
+EmitIR::operator()(ContinueStmt* obj)
+{
+  auto& irb = *mCurIrb;
+  irb.CreateBr(mContinueBb);
 }
 
 //==============================================================================
