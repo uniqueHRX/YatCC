@@ -35,6 +35,12 @@ EmitIR::operator()(const Type* type)
       case Type::Spec::kInt:
         return llvm::Type::getInt32Ty(mCtx);
       // TODO: 在此添加对更多基础类型的处理
+      case Type::Spec::kVoid:
+        return llvm::Type::getVoidTy(mCtx);
+
+      case Type::Spec::kChar:
+        return llvm::Type::getInt8Ty(mCtx);
+
       default:
         ABORT();
     }
@@ -304,6 +310,9 @@ EmitIR::operator()(Stmt* obj)
   if (auto p = obj->dcst<ExprStmt>())
     return self(p);
 
+  if (auto p = obj->dcst<IfStmt>())
+    return self(p);
+
   ABORT();
 }
 
@@ -344,6 +353,45 @@ void
 EmitIR::operator()(ExprStmt* obj)
 {
   self(obj->expr);
+}
+
+void
+EmitIR::operator()(IfStmt* obj)
+{
+  auto& irb = *mCurIrb;
+
+  // 创建基本块
+  llvm::BasicBlock *thenBb = nullptr, *elseBb = nullptr, *mergeBb = nullptr;
+  thenBb = llvm::BasicBlock::Create(mCtx, "if.then", mCurFunc);
+  if (obj->else_) elseBb = llvm::BasicBlock::Create(mCtx, "if.else", mCurFunc);
+  mergeBb = llvm::BasicBlock::Create(mCtx, "if.end", mCurFunc);
+
+  // 直接在原基本块开始判断if的条件
+  auto condVal = self(obj->cond);
+  if (condVal->getType()->isIntegerTy(32))
+    condVal = irb.CreateICmpNE(condVal, irb.getInt32(0));
+
+  // 根据条件值跳转到不同的基本块
+  irb.CreateCondBr(condVal, thenBb, elseBb ? elseBb : mergeBb);
+
+  // 处理then部分
+  irb.SetInsertPoint(thenBb);
+  self(obj->then);
+  // 如果then部分没有以跳转语句结束，则添加跳转到mergeBb的指令
+  if (!irb.GetInsertBlock()->getTerminator())
+    irb.CreateBr(mergeBb);
+
+  // 如果有else部分，则处理else部分
+  if (elseBb) {
+    irb.SetInsertPoint(elseBb);
+    self(obj->else_);
+    // 如果else部分没有以跳转语句结束，则添加跳转到mergeBb的指令
+    if (!irb.GetInsertBlock()->getTerminator())
+      irb.CreateBr(mergeBb);
+  }
+
+  // 调整插入点到mergeBb，方便后续的代码生成
+  mCurIrb->SetInsertPoint(mergeBb);
 }
 
 //==============================================================================
@@ -388,7 +436,7 @@ EmitIR::trans_init(llvm::Value* val, Expr* obj, llvm::Type* initTy)
     }
     return;
   }
-  
+
   // 处理单值初始化
   else {
     auto initVal = self(obj);
