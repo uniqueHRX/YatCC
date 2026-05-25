@@ -60,6 +60,8 @@ private:
 
   void operator()(asg::Stmt* obj);
 
+  void operator()(asg::NullStmt* obj);
+
   void operator()(asg::CompoundStmt* obj);
 
   void operator()(asg::ReturnStmt* obj);

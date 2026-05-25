@@ -158,38 +158,71 @@ EmitIR::operator()(asg::BinaryExpr* obj)
   llvm::Value *lftVal, *rhtVal;
 
   switch (obj->op) {
-    case BinaryExpr::Op::kAdd:
-      return irb.CreateAdd(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kAdd: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateAdd(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kSub:
-      return irb.CreateSub(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kSub: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateSub(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kMul:
-      return irb.CreateMul(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kMul: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateMul(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kDiv:
-      return irb.CreateSDiv(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kDiv: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateSDiv(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kMod:
-      return irb.CreateSRem(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kMod: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateSRem(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kGt:
-      return irb.CreateICmpSGT(self(obj->lft), self(obj->rht));
-    
-    case BinaryExpr::Op::kLt:
-      return irb.CreateICmpSLT(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kGt: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateICmpSGT(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kGe:
-      return irb.CreateICmpSGE(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kLt: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateICmpSLT(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kLe:
-      return irb.CreateICmpSLE(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kGe: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateICmpSGE(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kEq:
-      return irb.CreateICmpEQ(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kLe: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateICmpSLE(lftVal, rhtVal);
+    }
 
-    case BinaryExpr::Op::kNe:
-      return irb.CreateICmpNE(self(obj->lft), self(obj->rht));
+    case BinaryExpr::Op::kEq: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateICmpEQ(lftVal, rhtVal);
+    }
+
+    case BinaryExpr::Op::kNe: {
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
+      return irb.CreateICmpNE(lftVal, rhtVal);
+    }
 
     case BinaryExpr::Op::kAnd: {
       // 短路求值基本块
@@ -218,7 +251,7 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       auto phi = irb.CreatePHI(llvm::Type::getInt1Ty(mCtx), 2, "merge");
       phi->addIncoming(irb.getInt1(0), predBb);
       phi->addIncoming(rhtVal, rhtBb);
-      return irb.CreateZExt(phi, llvm::Type::getInt32Ty(mCtx));
+      return phi;
     }
 
     case BinaryExpr::Op::kOr: {
@@ -248,7 +281,7 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       auto phi = irb.CreatePHI(llvm::Type::getInt1Ty(mCtx), 2, "merge");
       phi->addIncoming(irb.getInt1(1), predBb);
       phi->addIncoming(rhtVal, rhtBb);
-      return irb.CreateZExt(phi, llvm::Type::getInt32Ty(mCtx));
+      return phi;
     }
 
     case BinaryExpr::Op::kAssign:
@@ -267,6 +300,8 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       auto ty = self(p->type);
       lftVal = self(obj->lft);
       rhtVal = self(obj->rht);
+      if (!rhtVal->getType()->isIntegerTy(64))
+        rhtVal = irb.CreateSExt(rhtVal, irb.getInt64Ty());
       auto gep = irb.CreateInBoundsGEP(ty, lftVal, {irb.getInt64(0), rhtVal});
       return gep;
     }
@@ -359,6 +394,9 @@ EmitIR::operator()(Stmt* obj)
 {
   // TODO: 在此添加对更多Stmt类型的处理的跳转
 
+  if (auto p = obj->dcst<NullStmt>())
+    return self(p);
+
   if (auto p = obj->dcst<CompoundStmt>())
     return self(p);
 
@@ -384,6 +422,12 @@ EmitIR::operator()(Stmt* obj)
     return self(p);
 
   ABORT();
+}
+
+void
+EmitIR::operator()(NullStmt* obj)
+{
+  return;
 }
 
 void
