@@ -302,8 +302,17 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       rhtVal = self(obj->rht);
       if (!rhtVal->getType()->isIntegerTy(64))
         rhtVal = irb.CreateSExt(rhtVal, irb.getInt64Ty());
-      auto gep = irb.CreateInBoundsGEP(ty, lftVal, {irb.getInt64(0), rhtVal});
-      return gep;
+
+      // 指针类型
+      if (obj->lft->type->texp->dcst<PointerType>()) {
+        Type elem;
+        elem.spec = obj->lft->type->spec;
+        elem.qual = obj->lft->type->qual;
+        elem.texp = obj->lft->type->texp->dcst<PointerType>()->sub;
+        return irb.CreateInBoundsGEP(self(&elem), lftVal, {rhtVal});
+      }
+      // 数组类型
+      return irb.CreateInBoundsGEP(ty, lftVal, {irb.getInt64(0), rhtVal});
     }
 
     default:
@@ -696,4 +705,7 @@ EmitIR::operator()(FunctionDecl* obj)
     exitIrb.CreateRetVoid();
   else
     exitIrb.CreateUnreachable();
+
+  mCurFunc = nullptr;
+  mCurIrb->ClearInsertionPoint();
 }
