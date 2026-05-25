@@ -139,8 +139,11 @@ EmitIR::operator()(UnaryExpr* obj)
     case UnaryExpr::Op::kNeg:
       return irb.CreateNeg(sub);
 
-    case UnaryExpr::Op::kNot:
-      return irb.CreateICmpEQ(sub, irb.getInt32(0));
+    case UnaryExpr::Op::kNot: {
+      if (!sub->getType()->isIntegerTy(1))
+        sub = irb.CreateICmpNE(sub, llvm::ConstantInt::get(sub->getType(), 0));
+      return irb.CreateNot(sub);
+    }
 
     default:
       ABORT();
@@ -151,61 +154,119 @@ EmitIR::operator()(UnaryExpr* obj)
 llvm::Value*
 EmitIR::operator()(asg::BinaryExpr* obj)
 {
-  llvm::Value *lftVal = self(obj->lft);
-  llvm::Value *rhtVal = self(obj->rht);
-
   auto& irb = *mCurIrb;
+  llvm::Value *lftVal, *rhtVal;
 
   switch (obj->op) {
     case BinaryExpr::Op::kAdd:
-      return irb.CreateAdd(lftVal, rhtVal);
+      return irb.CreateAdd(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kSub:
-      return irb.CreateSub(lftVal, rhtVal);
+      return irb.CreateSub(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kMul:
-      return irb.CreateMul(lftVal, rhtVal);
+      return irb.CreateMul(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kDiv:
-      return irb.CreateSDiv(lftVal, rhtVal);
+      return irb.CreateSDiv(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kMod:
-      return irb.CreateSRem(lftVal, rhtVal);
+      return irb.CreateSRem(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kGt:
-      return irb.CreateICmpSGT(lftVal, rhtVal);
+      return irb.CreateICmpSGT(self(obj->lft), self(obj->rht));
     
     case BinaryExpr::Op::kLt:
-      return irb.CreateICmpSLT(lftVal, rhtVal);
+      return irb.CreateICmpSLT(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kGe:
-      return irb.CreateICmpSGE(lftVal, rhtVal);
+      return irb.CreateICmpSGE(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kLe:
-      return irb.CreateICmpSLE(lftVal, rhtVal);
+      return irb.CreateICmpSLE(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kEq:
-      return irb.CreateICmpEQ(lftVal, rhtVal);
+      return irb.CreateICmpEQ(self(obj->lft), self(obj->rht));
 
     case BinaryExpr::Op::kNe:
-      return irb.CreateICmpNE(lftVal, rhtVal);
+      return irb.CreateICmpNE(self(obj->lft), self(obj->rht));
 
-    case BinaryExpr::Op::kAnd:
-      return irb.CreateAnd(lftVal, rhtVal);
+    case BinaryExpr::Op::kAnd: {
+      // 短路求值基本块
+      auto trueBb = llvm::BasicBlock::Create(mCtx, "and.true", mCurFunc);
+      auto endBb = llvm::BasicBlock::Create(mCtx, "and.end", mCurFunc);
 
-    case BinaryExpr::Op::kOr:
-      return irb.CreateOr(lftVal, rhtVal);
+      // 在原基本块判断左侧值
+      lftVal = self(obj->lft);
+      if (!lftVal->getType()->isIntegerTy(1))
+        lftVal = irb.CreateICmpNE(lftVal, llvm::ConstantInt::get(lftVal->getType(), 0));
+      irb.CreateCondBr(lftVal, trueBb, endBb);
+      auto predBb = irb.GetInsertBlock();
+
+      // 在trueBb判断右侧值
+      irb.SetInsertPoint(trueBb);
+      rhtVal = self(obj->rht);
+      if (!rhtVal->getType()->isIntegerTy(1))
+        rhtVal = irb.CreateICmpNE(rhtVal, llvm::ConstantInt::get(rhtVal->getType(), 0));
+      irb.CreateBr(endBb);
+      // 由于内层可能也有短路求值，需要获取右侧值的基本块以便后续phi指令使用
+      auto rhtBb = irb.GetInsertBlock();
+
+      // 在endBb合并结果
+      irb.SetInsertPoint(endBb);
+      // phi指令
+      auto phi = irb.CreatePHI(llvm::Type::getInt1Ty(mCtx), 2, "merge");
+      phi->addIncoming(irb.getInt1(0), predBb);
+      phi->addIncoming(rhtVal, rhtBb);
+      return irb.CreateZExt(phi, llvm::Type::getInt32Ty(mCtx));
+    }
+
+    case BinaryExpr::Op::kOr: {
+      // 短路求值基本块
+      auto falseBb = llvm::BasicBlock::Create(mCtx, "or.false", mCurFunc);
+      auto endBb = llvm::BasicBlock::Create(mCtx, "or.end", mCurFunc);
+
+      // 在原基本块判断左侧值
+      lftVal = self(obj->lft);
+      if (!lftVal->getType()->isIntegerTy(1))
+        lftVal = irb.CreateICmpNE(lftVal, llvm::ConstantInt::get(lftVal->getType(), 0));
+      irb.CreateCondBr(lftVal, endBb, falseBb);
+      auto predBb = irb.GetInsertBlock();
+
+      // 在falseBb判断右侧值
+      irb.SetInsertPoint(falseBb);
+      rhtVal = self(obj->rht);
+      if (!rhtVal->getType()->isIntegerTy(1))
+        rhtVal = irb.CreateICmpNE(rhtVal, llvm::ConstantInt::get(rhtVal->getType(), 0));
+      irb.CreateBr(endBb);
+      // 由于内层可能也有短路求值，需要获取右侧值的基本块以便后续phi指令使用
+      auto rhtBb = irb.GetInsertBlock();
+
+      // 在endBb合并结果
+      irb.SetInsertPoint(endBb);
+      // phi指令
+      auto phi = irb.CreatePHI(llvm::Type::getInt1Ty(mCtx), 2, "merge");
+      phi->addIncoming(irb.getInt1(1), predBb);
+      phi->addIncoming(rhtVal, rhtBb);
+      return irb.CreateZExt(phi, llvm::Type::getInt32Ty(mCtx));
+    }
 
     case BinaryExpr::Op::kAssign:
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
       irb.CreateStore(rhtVal, lftVal);
       return rhtVal;
 
     case BinaryExpr::Op::kComma:
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
       return rhtVal;
 
     case BinaryExpr::Op::kIndex: {
       auto p = obj->lft->dcst<ImplicitCastExpr>()->sub;
       auto ty = self(p->type);
+      lftVal = self(obj->lft);
+      rhtVal = self(obj->rht);
       auto gep = irb.CreateInBoundsGEP(ty, lftVal, {irb.getInt64(0), rhtVal});
       return gep;
     }
