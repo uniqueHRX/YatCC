@@ -64,10 +64,124 @@ ConstantFolding::run(Module& mod, ModuleAnalysisManager& mam)
               }
               break;
             }
+            case Instruction::URem:
+            case Instruction::SRem: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() % constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
+            case Instruction::Shl: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() << constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
+            case Instruction::AShr: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() >> constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
+            case Instruction::LShr: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() >> constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
+            case Instruction::And: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() & constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
+            case Instruction::Or: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() | constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
+            case Instruction::Xor: {
+              if (constLhs && constRhs) {
+                binOp->replaceAllUsesWith(ConstantInt::getSigned(
+                  binOp->getType(),
+                  constLhs->getSExtValue() ^ constRhs->getSExtValue()));
+                instToErase.push_back(binOp);
+                ++constFoldTimes;
+              }
+              break;
+            }
             default:
               break;
           }
         }
+        // 判断当前指令是否是整数比较指令 (对应 ICmpSGT/SLT/SGE/SLE/EQ/NE)
+        if (auto icmp = dyn_cast<ICmpInst>(&inst)) {
+          Value* lhs = icmp->getOperand(0);
+          Value* rhs = icmp->getOperand(1);
+          auto constLhs = dyn_cast<ConstantInt>(lhs);
+          auto constRhs = dyn_cast<ConstantInt>(rhs);
+          if (constLhs && constRhs) {
+            bool result;
+            switch (icmp->getPredicate()) {
+              case CmpInst::ICMP_SGT:
+                result =
+                  constLhs->getSExtValue() > constRhs->getSExtValue();
+                break;
+              case CmpInst::ICMP_SLT:
+                result =
+                  constLhs->getSExtValue() < constRhs->getSExtValue();
+                break;
+              case CmpInst::ICMP_SGE:
+                result =
+                  constLhs->getSExtValue() >= constRhs->getSExtValue();
+                break;
+              case CmpInst::ICMP_SLE:
+                result =
+                  constLhs->getSExtValue() <= constRhs->getSExtValue();
+                break;
+              case CmpInst::ICMP_EQ:
+                result =
+                  constLhs->getSExtValue() == constRhs->getSExtValue();
+                break;
+              case CmpInst::ICMP_NE:
+                result =
+                  constLhs->getSExtValue() != constRhs->getSExtValue();
+                break;
+              default:
+                continue;
+            }
+            icmp->replaceAllUsesWith(
+              ConstantInt::getBool(icmp->getContext(), result));
+            instToErase.push_back(icmp);
+            ++constFoldTimes;
+          }
+        }
+
       }
       // 统一删除被折叠为常量的指令
       for (auto& i : instToErase)
