@@ -11,7 +11,7 @@ EmitIR::EmitIR(Obj::Mgr& mgr, llvm::LLVMContext& ctx, llvm::StringRef mid)
   , mCtx(ctx)
   , mIntTy(llvm::Type::getInt32Ty(ctx))
   , mCurIrb(std::make_unique<llvm::IRBuilder<>>(ctx))
-  , mCtorTy(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), false))
+  , mCtorTy(llvm::FunctionType::get(llvm::Type::getVoidTy(ctx), false)), mCurFunc(nullptr), mExitBb(nullptr), mContinueBb(nullptr)
 {
 }
 
@@ -251,7 +251,7 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       auto phi = irb.CreatePHI(llvm::Type::getInt1Ty(mCtx), 2, "merge");
       phi->addIncoming(irb.getInt1(0), predBb);
       phi->addIncoming(rhtVal, rhtBb);
-      return phi;
+      return irb.CreateZExt(phi, llvm::Type::getInt32Ty(mCtx));
     }
 
     case BinaryExpr::Op::kOr: {
@@ -281,7 +281,7 @@ EmitIR::operator()(asg::BinaryExpr* obj)
       auto phi = irb.CreatePHI(llvm::Type::getInt1Ty(mCtx), 2, "merge");
       phi->addIncoming(irb.getInt1(1), predBb);
       phi->addIncoming(rhtVal, rhtBb);
-      return phi;
+      return irb.CreateZExt(phi, llvm::Type::getInt32Ty(mCtx));
     }
 
     case BinaryExpr::Op::kAssign:
@@ -491,7 +491,7 @@ EmitIR::operator()(IfStmt* obj)
 
   // 直接在原基本块开始判断if的条件
   auto condVal = self(obj->cond);
-  if (condVal->getType()->isIntegerTy(32))
+  if (!condVal->getType()->isIntegerTy(1))
     condVal = irb.CreateICmpNE(condVal, irb.getInt32(0));
 
   // 根据条件值跳转到不同的基本块
@@ -533,15 +533,19 @@ EmitIR::operator()(WhileStmt* obj)
   // 处理条件判断基本块
   irb.SetInsertPoint(condBb);
   auto condVal = self(obj->cond);
-  if (condVal->getType()->isIntegerTy(32))
+  if (!condVal->getType()->isIntegerTy(1))
     condVal = irb.CreateICmpNE(condVal, irb.getInt32(0));
   irb.CreateCondBr(condVal, bodyBb, mergeBb);
 
   // 处理循环体基本块
   irb.SetInsertPoint(bodyBb);
+  auto savedExitBb = mExitBb;
+  auto savedContinueBb = mContinueBb;
   mExitBb = mergeBb;
   mContinueBb = condBb;
   self(obj->body);
+  mExitBb = savedExitBb;
+  mContinueBb = savedContinueBb;
   // 如果循环体没有以跳转语句结束，则添加跳转回condBb的指令
   if (!irb.GetInsertBlock()->getTerminator())
     irb.CreateBr(condBb);
@@ -706,6 +710,7 @@ EmitIR::operator()(FunctionDecl* obj)
   else
     exitIrb.CreateUnreachable();
 
+  // 清理成员变量状态
   mCurFunc = nullptr;
   mCurIrb->ClearInsertionPoint();
 }
