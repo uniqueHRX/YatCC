@@ -8,6 +8,8 @@
 
 #include "ConstantFolding.hpp"
 #include "ConstantPropagation.hpp"
+#include "StrengthReduction.hpp"
+#include "AlgebraicIdentities.hpp"
 #include "Mem2Reg.hpp"
 #include "StaticCallCounter.hpp"
 #include "StaticCallCounterPrinter.hpp"
@@ -88,6 +90,8 @@ opt(llvm::Module& mod)
   mpm.addPass(Mem2Reg());
   mpm.addPass(ConstantPropagation(llvm::errs()));
   mpm.addPass(ConstantFolding(llvm::errs()));
+  mpm.addPass(StrengthReduction(llvm::errs()));
+  mpm.addPass(AlgebraicIdentities(llvm::errs()));
 
 #endif
 
