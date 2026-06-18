@@ -13,6 +13,7 @@
 #include "CSE.hpp"
 #include "DCE.hpp"
 #include "DSE.hpp"
+#include "InstructionCombining.hpp"
 #include "Mem2Reg.hpp"
 #include "StaticCallCounter.hpp"
 #include "StaticCallCounterPrinter.hpp"
@@ -96,6 +97,7 @@ opt(llvm::Module& mod)
   mpm.addPass(CSE(llvm::errs()));
   mpm.addPass(DSE(llvm::errs()));
   mpm.addPass(DCE(llvm::errs()));
+  mpm.addPass(InstructionCombining(llvm::errs()));
   mpm.addPass(StrengthReduction(llvm::errs()));
   mpm.addPass(AlgebraicIdentities(llvm::errs()));
 
