@@ -5,18 +5,14 @@ using namespace llvm;
 PreservedAnalyses
 LICM::run(Module& mod, ModuleAnalysisManager& mam)
 {
-  // 注册 LoopAnalysis 分析器，以便在 LICM 中使用循环信息
-  FunctionAnalysisManager fam;
-  PassBuilder pb;
-  fam.registerPass([&] { return LoopAnalysis(); });
-  pb.registerFunctionAnalyses(fam);
-
   int hoistTimes = 0;
+
   // 遍历模块中的每个函数
   for (Function& func : mod) {
     if (func.isDeclaration()) continue;
     // 获取函数的循环分析结果
-    auto& LI = fam.getResult<LoopAnalysis>(func);
+    DominatorTree DT(func);
+    LoopInfo LI(DT);
     // 由内向外遍历函数中的每个循环
     for (auto* loop : LI.getLoopsInPreorder()) {
       auto preheader = loop->getLoopPreheader();
