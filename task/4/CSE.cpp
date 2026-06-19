@@ -67,7 +67,7 @@ CSE::run(Module& mod, ModuleAnalysisManager& mam)
       std::vector<Instruction*> toErase;
       // 遍历基本块中的每条指令
       for (Instruction& inst : bb) {
-        // 只处理二元运算指令
+        // 处理二元运算指令
         if (auto binOp = dyn_cast<BinaryOperator>(&inst)) {
           // 解析指令参数
           auto opcode = binOp->getOpcode();
@@ -97,6 +97,32 @@ CSE::run(Module& mod, ModuleAnalysisManager& mam)
           } 
           else {
             // 如果不存在相同的表达式，将当前表达式和对应的值存入哈希表
+            exprMap[expr] = &inst;
+          }
+        }
+        // 处理比较指令
+        else if (auto icmp = dyn_cast<ICmpInst>(&inst)) {
+          auto opcode = icmp->getPredicate();
+          std::vector<Value*> operands;
+          for (unsigned i = 0; i < icmp->getNumOperands(); ++i) {
+            operands.push_back(icmp->getOperand(i));
+          }
+          if (icmp->isCommutative()) {
+            std::sort(operands.begin(), operands.end());
+          }
+          Expression expr(opcode, operands);
+          auto it = exprMap.find(expr);
+          if (it != exprMap.end()) {
+            if (DT.dominates(it->second, &inst)) {
+              inst.replaceAllUsesWith(it->second);
+              toErase.push_back(&inst);
+              ++cseTimes;
+            }
+            else {
+              exprMap[expr] = &inst;
+            }
+          } 
+          else {
             exprMap[expr] = &inst;
           }
         }
