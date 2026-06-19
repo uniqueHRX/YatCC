@@ -13,6 +13,7 @@
 #include "CSE.hpp"
 #include "DCE.hpp"
 #include "DSE.hpp"
+#include "Inliner.hpp"
 #include "InstructionCombining.hpp"
 #include "LICM.hpp"
 #include "LoopUnrolling.hpp"
@@ -94,8 +95,9 @@ opt(llvm::Module& mod)
   // 添加优化pass到管理器中
   mpm.addPass(StaticCallCounterPrinter(llvm::errs()));
   mpm.addPass(Mem2Reg());
+  mpm.addPass(Inliner(llvm::errs()));
   mpm.addPass(LICM(llvm::errs()));
-  // mpm.addPass(LoopUnrolling(llvm::errs()));
+  mpm.addPass(LoopUnrolling(llvm::errs()));
   mpm.addPass(ConstantPropagation(llvm::errs()));
   mpm.addPass(ConstantFolding(llvm::errs()));
   mpm.addPass(CSE(llvm::errs()));
