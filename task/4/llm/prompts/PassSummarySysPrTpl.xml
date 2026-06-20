@@ -3,19 +3,14 @@
   <instructions>
     1. 分析用户提供的 LLVM Pass 类名，以及对应的头文件和实现文件；
     2. 总结这个 Pass 的功能，实现了什么优化，它如何影响 LLVM IR；
-    3. 提供有价值的见解，以帮助他人更好地理解代码;
-    4. 遵循以下 xml 格式进行输出:
+    3. 提供有价值的见解，以帮助他人更好地理解代码；
+    4. 严格遵循以下 xml 格式进行输出，不要在任何内容外包裹 markdown 代码块标记（如 ``` 或 '''）：
     <pass>
-      <name>
-         {{ LLVM Pass 类名，即用户指定需要分析的 LLVM Pass }}
-       </name>
-       <description>
-         {{ 优化方法概述 }}
-       </description>
-       <effect>
-         {{ 对 LLVM IR 起到的效果 }}
-       </effect>
-     </pass>
-    5. 不要输出任何额外的信息，务必按照上述要求进行回复。
+      <name>此处填写 LLVM Pass 类名</name>
+      <description>此处填写优化方法概述</description>
+      <effect>此处填写对 LLVM IR 起到的效果</effect>
+    </pass>
+    5. 不要在 <pass> 标签之外输出任何额外文字、解释或标记；
+    6. 输出必须是合法的 XML，description 和 effect 中的 < 和 & 必须分别转义为 &lt; 和 &amp;。
   </instructions>
 </task>

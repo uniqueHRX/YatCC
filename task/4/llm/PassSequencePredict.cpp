@@ -83,7 +83,7 @@ PassSequencePredict::pass_summary(PassSequencePredict::PassInfo& passInfo)
   handlers.append(llm.attr("remove_md_block_marker")("xml"));
   std::string response = mHelper.chat(
     sessionID,
-    "deepseek-r1",
+    "deepseek-v4-flash",
     handlers,
     Py::dict("max_tokens"_a = 8192, "stream"_a = false, "temperature"_a = 0));
 
@@ -131,23 +131,37 @@ PassSequencePredict::run(llvm::Module& mod, llvm::ModuleAnalysisManager& mam)
   mHelper.add_content(sessionID, Role::kSystem, systemPrompt);
   mHelper.add_content(sessionID, Role::kUser, userPrompt);
 
-  // 处理大语言模型回复
-  Py::list handlers;
   Py::module_ llm = Py::module_::import("llm");
-  handlers.append(llm.attr("remove_deepseek_r1_think"));
-  handlers.append(llm.attr("remove_md_block_marker")("xml"));
-  // 提取 pass sequence
-  handlers.append(llm.attr("extract_text_from_xml")("sequence"));
 
-  // 发送会话
-  std::string response = mHelper.chat(
+  // 第一步：获取 LLM 原始响应，仅做清理（去除 think 和 markdown 包裹）
+  Py::list cleanHandlers;
+  cleanHandlers.append(llm.attr("remove_deepseek_r1_think"));
+  cleanHandlers.append(llm.attr("remove_md_block_marker")("xml"));
+  std::string cleanResponse = mHelper.chat(
     sessionID,
-    "deepseek-r1",
-    handlers,
-    Py::dict("max_tokens"_a = 8192, "temperature"_a = 0, "stream"_a = false));
+    "deepseek-v4-flash",
+    cleanHandlers,
+    Py::dict("max_tokens"_a = 25600, "temperature"_a = 0.1, "stream"_a = false));
+
+  // 第二步：从清理后的 XML 中分别提取 reasoning 和 sequence
+  std::string reasoning =
+    llm.attr("extract_xml_tag")(cleanResponse, "reasoning")
+      .cast<std::string>();
+  std::string sequence =
+    llm.attr("extract_xml_tag")(cleanResponse, "sequence")
+      .cast<std::string>();
+
+  // 输出 LLM 的推理过程到日志，提供可解释性
+  llvm::errs() << "\n========================================\n";
+  llvm::errs() << "LLM Pass 序列预测分析\n";
+  llvm::errs() << "========================================\n";
+  llvm::errs() << reasoning << "\n";
+  llvm::errs() << "----------------------------------------\n";
+  llvm::errs() << "预测序列: " << sequence << "\n";
+  llvm::errs() << "========================================\n\n";
 
   // 将字符串形式的 pass sequence 转换为 Py::list
-  auto passSequence = Py::str(response).attr("split")(",").cast<Py::list>();
+  auto passSequence = Py::str(sequence).attr("split")(",").cast<Py::list>();
 
   // 定义 pass 类名到 <向 ModulePassManager 添加其实例的函数> 的映射
   std::unordered_map<std::string, std::function<void(llvm::ModulePassManager&)>>

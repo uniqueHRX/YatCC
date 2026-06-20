@@ -1,13 +1,11 @@
 <task>
   <user_input>
-    <name>
-      {name}
-    </name>
-    <hpp>
+    <name>{name}</name>
+    <hpp><![CDATA[
 {hpp}
-    </hpp>
-    <cpp>
-{cpp} 
-    </cpp>
+    ]]></hpp>
+    <cpp><![CDATA[
+{cpp}
+    ]]></cpp>
   </user_input>
 </task>

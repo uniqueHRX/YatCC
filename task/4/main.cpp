@@ -65,8 +65,8 @@ opt(llvm::Module& mod)
 
   // 添加 LLM 加持的 Pass 到优化管理器中
   mpm.addPass(PassSequencePredict(
-    "<api_key>",
-    "<base_url>",
+    "sk-IkaN52AW0UEoWBGXuRAlU88xiLRSebfOuvkWplVy9CgFAVkWCplle5Js1s0GpADA",
+    "https://opencode.ai/zen/go/v1",
     {
       { "StaticCallCounterPrinter",
         TASK4_DIR "/StaticCallCounterPrinter.hpp",
@@ -80,12 +80,82 @@ opt(llvm::Module& mod)
         TASK4_DIR "/Mem2Reg.cpp",
         "Mem2Reg.xml",
         [](llvm::ModulePassManager& mpm) { mpm.addPass(Mem2Reg()); } },
+      { "Inliner",
+        TASK4_DIR "/Inliner.hpp",
+        TASK4_DIR "/Inliner.cpp",
+        "Inliner.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(Inliner(llvm::errs()));
+        } },
+      { "LICM",
+        TASK4_DIR "/LICM.hpp",
+        TASK4_DIR "/LICM.cpp",
+        "LICM.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(LICM(llvm::errs()));
+        } },
+      { "LoopUnrolling",
+        TASK4_DIR "/LoopUnrolling.hpp",
+        TASK4_DIR "/LoopUnrolling.cpp",
+        "LoopUnrolling.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(LoopUnrolling(llvm::errs()));
+        } },
+      { "ConstantPropagation",
+        TASK4_DIR "/ConstantPropagation.hpp",
+        TASK4_DIR "/ConstantPropagation.cpp",
+        "ConstantPropagation.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(ConstantPropagation(llvm::errs()));
+        } },
       { "ConstantFolding",
         TASK4_DIR "/ConstantFolding.hpp",
         TASK4_DIR "/ConstantFolding.cpp",
         "ConstantFolding.xml",
         [](llvm::ModulePassManager& mpm) {
           mpm.addPass(ConstantFolding(llvm::errs()));
+        } },
+      { "CSE",
+        TASK4_DIR "/CSE.hpp",
+        TASK4_DIR "/CSE.cpp",
+        "CSE.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(CSE(llvm::errs()));
+        } },
+      { "DSE",
+        TASK4_DIR "/DSE.hpp",
+        TASK4_DIR "/DSE.cpp",
+        "DSE.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(DSE(llvm::errs()));
+        } },
+      { "DCE",
+        TASK4_DIR "/DCE.hpp",
+        TASK4_DIR "/DCE.cpp",
+        "DCE.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(DCE(llvm::errs()));
+        } },
+      { "InstructionCombining",
+        TASK4_DIR "/InstructionCombining.hpp",
+        TASK4_DIR "/InstructionCombining.cpp",
+        "InstructionCombining.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(InstructionCombining(llvm::errs()));
+        } },
+      { "StrengthReduction",
+        TASK4_DIR "/StrengthReduction.hpp",
+        TASK4_DIR "/StrengthReduction.cpp",
+        "StrengthReduction.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(StrengthReduction(llvm::errs()));
+        } },
+      { "AlgebraicIdentities",
+        TASK4_DIR "/AlgebraicIdentities.hpp",
+        TASK4_DIR "/AlgebraicIdentities.cpp",
+        "AlgebraicIdentities.xml",
+        [](llvm::ModulePassManager& mpm) {
+          mpm.addPass(AlgebraicIdentities(llvm::errs()));
         } },
     }));
 

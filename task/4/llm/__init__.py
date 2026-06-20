@@ -11,11 +11,17 @@ def remove_deepseek_r1_think(s: str) -> str:
     return s
 
 
-def remove_md_block_marker(markder: str):
+def remove_md_block_marker(marker: str):
     def remove(s: str) -> str:
-        if s.startswith(f"```{markder}"):
-            lines = s.splitlines()
-            s = "\n".join(lines[1:-1]).strip()
+        import re
+        s = s.strip()
+        # 匹配开头的 ```marker 或 '''marker（可能带空白）
+        start_pattern = re.compile(
+            r"^[`'']{3}\s*" + re.escape(marker) + r"\s*\n?"
+        )
+        s = start_pattern.sub("", s)
+        # 匹配结尾的 ``` 或 '''（可能带空白）
+        s = re.sub(r"\n?\s*[`'']{3}\s*$", "", s)
         return s
 
     return remove
@@ -23,14 +29,32 @@ def remove_md_block_marker(markder: str):
 
 def extract_text_from_xml(tag: str):
     def extract(s: str) -> str:
-        et = ET.fromstring(s)
-        node = et.find(tag)
-        assert node is not None, f"无法找到 tag 为 {tag} 的节点"
-        text = node.text
-        assert text is not None, "节点中不含有 text！"
-        return text.strip()
+        # 尝试 XML 解析
+        try:
+            et = ET.fromstring(s)
+            node = et.find(tag)
+            if node is not None and node.text is not None:
+                return node.text.strip()
+        except ET.ParseError:
+            pass  # XML 解析失败，fallback 到正则
+
+        # 正则 fallback：直接从文本中提取标签内容
+        import re
+        pattern = f"<{tag}>\\s*(.*?)\\s*</{tag}>"
+        match = re.search(pattern, s, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+
+        raise ValueError(
+            f"无法从响应中提取 tag 为 {tag} 的内容，响应前500字符: {s[:500]}"
+        )
 
     return extract
+
+
+def extract_xml_tag(xml_str: str, tag: str) -> str:
+    """从 XML 字符串中提取指定标签的文本内容"""
+    return extract_text_from_xml(tag)(xml_str)
 
 
 class LLMHelperImpl:
@@ -84,5 +108,14 @@ class LLMHelperImpl:
         )
 
         for handler in handlers:
-            response = handler(response)
+            try:
+                response = handler(response)
+            except Exception:
+                import sys
+                print(
+                    f"[DEBUG] Handler failed. "
+                    f"Current response (first 800 chars):\n{response[:800]}",
+                    file=sys.stderr,
+                )
+                raise
         return response
