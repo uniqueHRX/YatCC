@@ -25,6 +25,7 @@
 
 #include <pybind11/embed.h>
 
+#include "CodeAdvisor.hpp"
 #include "PassSequencePredict.hpp"
 
 namespace Py = pybind11;
@@ -157,6 +158,73 @@ opt(llvm::Module& mod)
         [](llvm::ModulePassManager& mpm) {
           mpm.addPass(AlgebraicIdentities(llvm::errs()));
         } },
+    }));
+
+  // 代码开发助手：分析优化后的 IR，结合已有的 Pass 描述给出进一步优化建议
+  mpm.addPass(CodeAdvisor(
+    "sk-IkaN52AW0UEoWBGXuRAlU88xiLRSebfOuvkWplVy9CgFAVkWCplle5Js1s0GpADA",
+    "https://opencode.ai/zen/go/v1",
+    {
+      { "Mem2Reg",
+        TASK4_DIR "/Mem2Reg.hpp",
+        TASK4_DIR "/Mem2Reg.cpp",
+        "Mem2Reg.xml",
+        nullptr },
+      { "Inliner",
+        TASK4_DIR "/Inliner.hpp",
+        TASK4_DIR "/Inliner.cpp",
+        "Inliner.xml",
+        nullptr },
+      { "LICM",
+        TASK4_DIR "/LICM.hpp",
+        TASK4_DIR "/LICM.cpp",
+        "LICM.xml",
+        nullptr },
+      { "LoopUnrolling",
+        TASK4_DIR "/LoopUnrolling.hpp",
+        TASK4_DIR "/LoopUnrolling.cpp",
+        "LoopUnrolling.xml",
+        nullptr },
+      { "ConstantPropagation",
+        TASK4_DIR "/ConstantPropagation.hpp",
+        TASK4_DIR "/ConstantPropagation.cpp",
+        "ConstantPropagation.xml",
+        nullptr },
+      { "ConstantFolding",
+        TASK4_DIR "/ConstantFolding.hpp",
+        TASK4_DIR "/ConstantFolding.cpp",
+        "ConstantFolding.xml",
+        nullptr },
+      { "CSE",
+        TASK4_DIR "/CSE.hpp",
+        TASK4_DIR "/CSE.cpp",
+        "CSE.xml",
+        nullptr },
+      { "DSE",
+        TASK4_DIR "/DSE.hpp",
+        TASK4_DIR "/DSE.cpp",
+        "DSE.xml",
+        nullptr },
+      { "DCE",
+        TASK4_DIR "/DCE.hpp",
+        TASK4_DIR "/DCE.cpp",
+        "DCE.xml",
+        nullptr },
+      { "InstructionCombining",
+        TASK4_DIR "/InstructionCombining.hpp",
+        TASK4_DIR "/InstructionCombining.cpp",
+        "InstructionCombining.xml",
+        nullptr },
+      { "StrengthReduction",
+        TASK4_DIR "/StrengthReduction.hpp",
+        TASK4_DIR "/StrengthReduction.cpp",
+        "StrengthReduction.xml",
+        nullptr },
+      { "AlgebraicIdentities",
+        TASK4_DIR "/AlgebraicIdentities.hpp",
+        TASK4_DIR "/AlgebraicIdentities.cpp",
+        "AlgebraicIdentities.xml",
+        nullptr },
     }));
 
 #else

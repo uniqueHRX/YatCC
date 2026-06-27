@@ -1,0 +1,10 @@
+<task>
+  <user_input>
+    <passes>
+{passes}
+    </passes>
+    <optimized_ir><![CDATA[
+{ir}
+    ]]></optimized_ir>
+  </user_input>
+</task>

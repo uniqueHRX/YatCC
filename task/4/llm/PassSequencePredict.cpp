@@ -85,7 +85,7 @@ PassSequencePredict::pass_summary(PassSequencePredict::PassInfo& passInfo)
     sessionID,
     "deepseek-v4-flash",
     handlers,
-    Py::dict("max_tokens"_a = 8192, "stream"_a = false, "temperature"_a = 0));
+    Py::dict("max_tokens"_a = 25600, "stream"_a = false, "temperature"_a = 0));
 
   write_file(passInfo.mSummaryPath, response);
 
@@ -170,12 +170,31 @@ PassSequencePredict::run(llvm::Module& mod, llvm::ModuleAnalysisManager& mam)
     map[passInfo.mClassName] = passInfo.mAddPass;
   }
 
-  // 向 mpm 中添加 pass
+  // 统计执行前的 IR 指令数
+  unsigned beforeCount = 0;
+  for (auto& func : mod) {
+    for (auto& bb : func) {
+      beforeCount += bb.size();
+    }
+  }
+
+  // 向 mpm 中添加 pass 并执行
   llvm::ModulePassManager mpm;
   for (auto& passClassName : passSequence) {
     map[passClassName.cast<std::string>()](mpm);
   }
   mpm.run(mod, mam);
+
+  // 统计执行后的 IR 指令数
+  unsigned afterCount = 0;
+  for (auto& func : mod) {
+    for (auto& bb : func) {
+      afterCount += bb.size();
+    }
+  }
+
+  llvm::errs() << "IR 指令数: " << beforeCount << " -> " << afterCount
+               << " (减少 " << (beforeCount - afterCount) << ")\n";
 
   // 删除会话
   mHelper.delete_session(sessionID);
