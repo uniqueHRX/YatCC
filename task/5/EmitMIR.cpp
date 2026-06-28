@@ -752,7 +752,60 @@ private:
   // 8) 自检重点：-1 与 0、INT_MIN 边界、以及无符号大数比较。
   void emitICmpInst(const llvm::ICmpInst& ci)
   {
-    // llvm::report_fatal_error("TODO: Student Implementation");
+    llvm::Register lhs = emitLoadValue(ci.getOperand(0));
+    llvm::Register rhs = emitLoadValue(ci.getOperand(1));
+    llvm::Register dst = vregOf(&ci);
+    llvm::Register tmp = nextTempVReg();
+    switch (ci.getPredicate()) {
+      case llvm::CmpInst::ICMP_EQ: {
+        emitVXor(tmp, lhs, rhs);
+        emitVSltiu(dst, tmp, 1);
+        break;
+      }
+      case llvm::CmpInst::ICMP_NE: {
+        emitVXor(tmp, lhs, rhs);
+        emitVSltu(dst, llvm::RISCV::X0, tmp);
+        break;
+      }
+      case llvm::CmpInst::ICMP_SLT: {
+        emitVSlt(dst, lhs, rhs);
+        break;
+      }
+      case llvm::CmpInst::ICMP_SGT: {
+        emitVSlt(dst, rhs, lhs);
+        break;
+      }
+      case llvm::CmpInst::ICMP_SLE: {
+        emitVSlt(tmp, rhs, lhs);
+        emitVXori(dst, tmp, 1);
+        break;
+      }
+      case llvm::CmpInst::ICMP_SGE: {
+        emitVSlt(tmp, lhs, rhs);
+        emitVXori(dst, tmp, 1);
+        break;
+      }
+      case llvm::CmpInst::ICMP_ULT: {
+        emitVSltu(dst, lhs, rhs);
+        break;
+      }
+      case llvm::CmpInst::ICMP_UGT: {
+        emitVSltu(dst, rhs, lhs);
+        break;
+      }
+      case llvm::CmpInst::ICMP_ULE: {
+        emitVSltu(tmp, rhs, lhs);
+        emitVXori(dst, tmp, 1);
+        break;
+      }
+      case llvm::CmpInst::ICMP_UGE: {
+        emitVSltu(tmp, lhs, rhs);
+        emitVXori(dst, tmp, 1);
+        break;
+      }
+      default:
+        llvm::report_fatal_error("unsupported ICmp predicate");
+    }
     return;
   }
 
